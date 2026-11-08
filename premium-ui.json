@@ -1,0 +1,23 @@
+{
+  "profile": "product-admin",
+  "sourceRoots": ["app", "lib/collection.ts"],
+  "locale": "pt-BR",
+  "canonicalMap": "UX-CONTRACT.md",
+  "requiredCapabilities": [
+    "Select/Listbox",
+    "Form",
+    "Scrollbar",
+    "Toast",
+    "CRUD"
+  ],
+  "ownership": { "Select/Listbox": "native" },
+  "requiredCommands": ["unit", "typecheck"],
+  "commands": {
+    "unit": "node --test tests/collection.test.mjs",
+    "typecheck": "npx tsc --noEmit"
+  },
+  "evidence": {
+    "crudFullFlow": "QA.md",
+    "failurePaths": "tests/collection.test.mjs"
+  }
+}
