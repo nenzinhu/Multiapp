@@ -42,11 +42,15 @@ variable, no database and no build-time secrets.
 - `app/chatgpt-auth.ts` — optional dispatch-owned ChatGPT sign-in helpers
 - `lib/collection.ts` — the collection model: normalization, validation,
   filtering, backup merge
+- `lib/vault.ts` — the encrypted vault: AES-GCM + PBKDF2, record validation,
+  backup merge
+- `lib/ai-providers.ts` — catalog of AI providers with a free tier
 - `lib/utils.ts` — `cn()` class helper
 - `components/ui/` — shadcn primitives used by the product (dialog, menu)
+- `components/vault/` — the vault screens (site passwords, AI API keys)
 - `vendor/shadcn-tailwind-4.13.0.css` — vendored shadcn base theme
 - `public/` — logo and favicon
-- `tests/collection.test.mjs` — unit tests for the collection model
+- `tests/` — unit tests for the collection and the vault
 
 ## Data rules
 
@@ -62,6 +66,29 @@ variable, no database and no build-time secrets.
   hostname; the full saved URL is never sent.
 - The initial selection is an editable starter set, explicitly labeled as
   such.
+
+## Cofre: senhas de sites e chaves de API
+
+"SEU ESPAÇO" has two extra entries: **Senhas de sites** and **Chaves de IA**.
+
+- The vault lives in its own `localStorage` key (`multiapp.vault.v1`) and holds
+  only ciphertext: records are sealed with AES-GCM-256 and the key is derived
+  from the master passphrase with PBKDF2-HMAC-SHA256 (210.000 rounds).
+- The master passphrase is never stored. If it is forgotten the records
+  cannot be recovered — export the vault regularly.
+- The vault starts locked on every page load and can be locked again with the
+  "Bloquear" button. The derived key only lives in memory, in the open tab.
+- Site credentials keep the site, the user and the password; API keys keep the
+  provider, the console address and the key. Notes are optional.
+- The provider catalog is a starting point: it lists AI providers with a free
+  tier and links to their console. Free quotas change often, so confirm the
+  limits in the provider panel.
+- Secrets are masked by default (`••••••1234`), can be revealed one at a time
+  and can be copied to the clipboard. Vault entries never request favicons, so
+  no hostname leaves the browser.
+- "Exportar" writes the encrypted envelope to a JSON file; "Importar" asks for
+  the passphrase of the imported file and merges the records, keeping the ones
+  already stored. Limits: 500 records per vault.
 
 ## Optional Dispatch-Owned ChatGPT Sign-In
 

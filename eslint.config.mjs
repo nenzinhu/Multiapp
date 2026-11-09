@@ -6,6 +6,8 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   globalIgnores([
+    ".cline-home/**",
+    ".next/**",
     "dist/**",
     ".vinext/**",
     ".wrangler/**",
@@ -28,6 +30,14 @@ const eslintConfig = defineConfig([
     rules: {
       // The collection is hydrated from localStorage on mount, so the initial
       // state is set inside an effect that reads an external system.
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
+  {
+    files: ["components/vault/**/*.{ts,tsx}"],
+    rules: {
+      // The vault reads its encrypted envelope from localStorage on mount and
+      // resets the dialog drafts when it opens.
       "react-hooks/set-state-in-effect": "off",
     },
   },

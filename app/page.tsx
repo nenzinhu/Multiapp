@@ -12,6 +12,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   ArrowUpRight,
+  Bot,
   Check,
   ChevronRight,
   Clock3,
@@ -19,6 +20,7 @@ import {
   Folder,
   FolderPlus,
   Grid2X2,
+  KeyRound,
   LayoutGrid,
   Link2,
   List,
@@ -47,6 +49,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { VaultView, type VaultSection } from "@/components/vault/vault-view";
 import {
   filterLinks,
   initialCollection,
@@ -158,6 +161,7 @@ export default function Home() {
   const [ready, setReady] = useState(false);
   const [storageError, setStorageError] = useState("");
   const [view, setView] = useState<View>("all");
+  const [section, setSection] = useState<"library" | VaultSection>("library");
   const [category, setCategory] = useState("");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("newest");
@@ -248,6 +252,7 @@ export default function Home() {
   function navigate(nextView: View, nextCategory = "") {
     setView(nextView);
     setCategory(nextCategory);
+    setSection("library");
     setMobileOpen(false);
   }
   function preference(key: "layout" | "sort", value: string) {
@@ -607,6 +612,28 @@ export default function Home() {
             <Clock3 size={18} />
             <span>Recentes</span>
           </button>
+          <button
+            className={section === "sites" ? "selected" : ""}
+            onClick={() => {
+              setSection("sites");
+              setMobileOpen(false);
+            }}
+            aria-current={section === "sites" ? "page" : undefined}
+          >
+            <KeyRound size={18} />
+            <span>Senhas de sites</span>
+          </button>
+          <button
+            className={section === "providers" ? "selected" : ""}
+            onClick={() => {
+              setSection("providers");
+              setMobileOpen(false);
+            }}
+            aria-current={section === "providers" ? "page" : undefined}
+          >
+            <Bot size={18} />
+            <span>Chaves de IA</span>
+          </button>
         </nav>
         <div className="category-heading">
           <span>CATEGORIAS</span>
@@ -725,7 +752,13 @@ export default function Home() {
             <Folder size={16} />
             <span>Meu espaço</span>
             <ChevronRight size={14} />
-            <strong>Biblioteca</strong>
+            <strong>
+              {section === "sites"
+                ? "Senhas de sites"
+                : section === "providers"
+                  ? "Chaves de IA"
+                  : "Biblioteca"}
+            </strong>
           </div>
           <span className="save-status">
             <span />
@@ -745,378 +778,384 @@ export default function Home() {
           </button>
         </header>
         <main>
-          <motion.div className="page-heading" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-            <div>
-              <div className="eyebrow">SUA INTERNET, ORGANIZADA</div>
-              <h1>
-                Menos abas.<br /><span>Mais possibilidades.</span>
-              </h1>
-              <p>Seu universo de apps, em um espaço só seu.</p>
-            </div>
-            <button
-              className="button primary add-top"
-              disabled={!ready || !!storageError}
-              onClick={() => (editor ? setEditorOpen(true) : openEditor())}
-            >
-              <Plus size={18} />
-              Adicionar app
-            </button>
-          </motion.div>
-          {storageError && (
-            <div className="error-banner" role="alert">
-              {storageError}
-              <button
-                className="button secondary"
-                onClick={() => window.location.reload()}
-              >
-                Tentar novamente
-              </button>
-            </div>
-          )}
-          <div className="workspace-overview" aria-label="Resumo da biblioteca">
-            <span><LayoutGrid size={15} /><strong>{ready ? collection.links.length : "—"}</strong> apps na coleção</span>
-            <span><Star size={15} /><strong>{ready ? favorites : "—"}</strong> favoritos</span>
-            <span><Folder size={15} /><strong>{ready ? collection.categories.length : "—"}</strong> categorias</span>
-            <span className="overview-note"><span /> Tudo no seu ritmo</span>
-          </div>
-          <section className="capture-box" aria-label="Adicionar por URL">
-            <div className="capture-symbol">
-              <Link2 size={23} />
-            </div>
-            <div className="capture-content">
-              <label htmlFor="quick-url">Um novo app por aí?</label>
-              <span>Cole o link e deixe o resto com a gente.</span>
-            </div>
-            <form onSubmit={quickAdd} noValidate className="capture-form">
-              <div className="url-wrap">
-                <Link2 size={16} />
-                <input
-                  id="quick-url"
-                  type="text"
-                  inputMode="url"
-                  autoComplete="off"
-                  placeholder="Cole a URL do app aqui..."
-                  value={quickUrl}
-                  aria-invalid={!!quickError}
-                  aria-describedby={quickError ? "quick-error" : undefined}
-                  onChange={(event) => {
-                    setQuickUrl(event.target.value);
-                    setQuickError("");
-                  }}
-                />
-              </div>
-              <button
-                className="button primary"
-                disabled={!ready || !!storageError}
-                type="submit"
-              >
-                <Plus size={17} />
-                <span>Adicionar</span>
-              </button>
-            </form>
-            {quickError && (
-              <p
-                id="quick-error"
-                className="capture-error field-error"
-                role="alert"
-              >
-                {quickError}
-              </p>
-            )}
-          </section>
-          {ready && favorites > 0 && view === "all" && !category && !query && (
-            <section className="favorites-shelf" aria-labelledby="favorites-title">
-              <div className="shelf-heading"><h2 id="favorites-title"><Star size={17} /> Sempre por perto</h2><button className="text-button" onClick={() => navigate("favorites")}>Ver favoritos <ArrowUpRight size={14} /></button></div>
-              <div className="favorite-shortcuts">
-                {collection.links.filter((link) => link.favorite).slice(0, 6).map((link) => (
-                  <motion.a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="favorite-shortcut" onClick={() => recordOpen(link)} whileHover={reduceMotion ? undefined : { y: -3 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }}>
-                    <Favicon url={link.url} name={link.name} /><span>{link.name}</span><ArrowUpRight size={14} /><span className="sr-only">Abrir em nova aba</span>
-                  </motion.a>
-                ))}
-              </div>
-            </section>
-          )}
-          <section
-            id="collection"
-            aria-labelledby="collection-title"
-            className="collection-section"
-          >
-            <div className="collection-heading">
+          {section === "library" ? (
+            <>
+            <motion.div className="page-heading" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
               <div>
-                <h2 id="collection-title">
-                  {title}
-                  <span className="count-badge">{visible.length}</span>
-                </h2>
-                <p>
-                  {category
-                    ? "Tudo desta categoria, em um só lugar."
-                    : view === "favorites"
-                      ? "Os que você quer sempre por perto."
-                      : view === "recent"
-                        ? "Os apps que você abriu por aqui."
-                        : "Um atalho para tudo o que você usa."}
-                </p>
+                <div className="eyebrow">SUA INTERNET, ORGANIZADA</div>
+                <h1>
+                  Menos abas.<br /><span>Mais possibilidades.</span>
+                </h1>
+                <p>Seu universo de apps, em um espaço só seu.</p>
               </div>
-              <div className="layout-toggle" aria-label="Visualização">
-                <button
-                  className={layout === "grid" ? "active" : ""}
-                  aria-label="Visualização em grade"
-                  aria-pressed={layout === "grid"}
-                  title="Grade"
-                  onClick={() => preference("layout", "grid")}
-                >
-                  <Grid2X2 size={17} />
-                </button>
-                <button
-                  className={layout === "list" ? "active" : ""}
-                  aria-label="Visualização em lista"
-                  aria-pressed={layout === "list"}
-                  title="Lista"
-                  onClick={() => preference("layout", "list")}
-                >
-                  <List size={19} />
-                </button>
-              </div>
-            </div>
-            <div className="collection-tools">
-              <div className="search-field">
-                <Search size={18} />
-                <input
-                  id="search"
-                  ref={searchRef}
-                  aria-label="Buscar apps"
-                  placeholder="Buscar por nome, link ou categoria..."
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-                {query ? (
-                  <button
-                    className="icon-button small"
-                    onClick={() => {
-                      setQuery("");
-                      searchRef.current?.focus();
-                    }}
-                    aria-label="Limpar busca"
-                  >
-                    <X size={16} />
-                  </button>
-                ) : (
-                  <kbd>Ctrl K</kbd>
-                )}
-              </div>
-              <div className="sort-field">
-                <label htmlFor="sort">Ordenar por</label>
-                <select
-                  id="sort"
-                  value={view === "recent" ? "recent" : sort}
-                  disabled={view === "recent"}
-                  onChange={(event) => preference("sort", event.target.value)}
-                >
-                  {view === "recent" ? (
-                    <option value="recent">Último acesso</option>
-                  ) : (
-                    <>
-                      <option value="newest">Mais recentes</option>
-                      <option value="name">Nome A–Z</option>
-                    </>
-                  )}
-                </select>
-              </div>
-            </div>
-            {(category || view !== "all" || query) && (
-              <div className="filter-summary">
-                <span>
-                  {visible.length}{" "}
-                  {visible.length === 1 ? "app encontrado" : "apps encontrados"}
-                  {query && ` para “${query}”`}
-                </span>
-                <button
-                  onClick={() => {
-                    setQuery("");
-                    navigate("all");
-                  }}
-                  className="text-button"
-                >
-                  Limpar filtros
-                  <X size={13} />
-                </button>
-              </div>
-            )}
-            {!ready ? (
-              <div className="empty-state" role="status">
-                <span className="empty-symbol">
-                  <LayoutGrid size={25} />
-                </span>
-                <h3>Carregando sua coleção…</h3>
-              </div>
-            ) : visible.length > 0 ? (
-              <div
-                className={`app-grid ${layout === "list" ? "list-view" : ""}`}
+              <button
+                className="button primary add-top"
+                disabled={!ready || !!storageError}
+                onClick={() => (editor ? setEditorOpen(true) : openEditor())}
               >
-                <AnimatePresence initial={false}>
-                {visible.map((link, index) => (
-                  <motion.article layout={!reduceMotion ? "position" : false} className="app-card" key={link.id}
-                    initial={{ opacity: 0, y: reduceMotion ? 0 : 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: reduceMotion ? 1 : 0.96 }}
-                    transition={{ opacity: { duration: 0.18 }, y: { duration: 0.3, delay: Math.min(index, 7) * 0.035 }, layout: { duration: 0.25 } }}
-                    whileHover={reduceMotion ? undefined : { y: -4 }}
-                  >
-                    <div className="card-top">
-                      <Favicon key={link.url} url={link.url} name={link.name} />
-                      <div className="card-actions">
-                        <button
-                          className={`icon-button favorite-button ${link.favorite ? "is-favorite" : ""}`}
-                          aria-label={
-                            link.favorite
-                              ? `Remover ${link.name} dos favoritos`
-                              : `Favoritar ${link.name}`
-                          }
-                          aria-pressed={link.favorite}
-                          title={
-                            link.favorite
-                              ? "Remover dos favoritos"
-                              : "Favoritar"
-                          }
-                          onClick={() => toggleFavorite(link)}
-                        >
-                          <Star size={16} />
-                        </button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            className="icon-button"
-                            aria-label={`Opções de ${link.name}`}
-                            title="Opções do app"
-                          >
-                            <MoreHorizontal size={19} />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="app-menu">
-                            <DropdownMenuItem onSelect={() => openEditor(link)}>
-                              <Pencil size={15} />
-                              Editar app
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onSelect={() => copyLink(link.url)}
-                            >
-                              <Copy size={15} />
-                              Copiar URL
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              variant="destructive"
-                              onSelect={() => removeLink(link)}
-                            >
-                              <Trash2 size={15} />
-                              Remover app
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                    <a
-                      className="card-link"
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={`Abrir ${link.name} em nova aba: ${link.url}`}
-                      onClick={() => recordOpen(link)}
-                    >
-                      <h3>{link.name}</h3>
-                      <span className="card-domain">
-                        {new URL(link.url).hostname.replace(/^www\./, "")}
-                      </span>
-                      <ArrowUpRight className="open-arrow" size={17} />
-                      <span className="sr-only"> — abrir em nova aba</span>
-                    </a>
-                    <div className="card-footer">
-                      <span
-                        className={`category-pill ${categoryColors[Math.max(0, collection.categories.indexOf(link.category)) % categoryColors.length]}`}
-                      >
-                        <span />
-                        {link.category}
-                      </span>
-                    </div>
-                  </motion.article>
-                ))}
-                </AnimatePresence>
-                {layout === "grid" && view === "all" && !query && (
-                  <button className="add-card" onClick={() => openEditor()}>
-                    <span>
-                      <Plus size={21} />
-                    </span>
-                    <strong>Adicionar app</strong>
-                    <small>Seu próximo atalho</small>
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="empty-state">
-                <span className="empty-symbol">
-                  {query ? (
-                    <Search size={26} />
-                  ) : view === "favorites" ? (
-                    <Star size={26} />
-                  ) : view === "recent" ? (
-                    <Clock3 size={26} />
-                  ) : (
-                    <LayoutGrid size={26} />
-                  )}
-                </span>
-                <h3>
-                  {query
-                    ? "Nenhum app encontrado"
-                    : view === "favorites"
-                      ? "Seus favoritos ficam aqui"
-                      : view === "recent"
-                        ? "Seu próximo clique começa aqui"
-                        : "Espaço para seus próximos apps"}
-                </h3>
-                <p>
-                  {query
-                    ? "Tente outro nome, domínio ou categoria."
-                    : view === "favorites"
-                      ? "Toque na estrela de um app para deixá-lo sempre à mão."
-                      : view === "recent"
-                        ? "Abra um app da sua biblioteca para vê-lo nesta lista."
-                        : "Cole uma URL acima ou adicione seu primeiro app."}
-                </p>
+                <Plus size={18} />
+                Adicionar app
+              </button>
+            </motion.div>
+            {storageError && (
+              <div className="error-banner" role="alert">
+                {storageError}
                 <button
                   className="button secondary"
-                  onClick={() => {
-                    if (query) setQuery("");
-                    else if (view !== "all") navigate("all");
-                    else openEditor();
-                  }}
+                  onClick={() => window.location.reload()}
                 >
-                  {query
-                    ? "Limpar busca"
-                    : view !== "all"
-                      ? "Ver todos os apps"
-                      : "Adicionar app"}
+                  Tentar novamente
                 </button>
               </div>
             )}
-            {ready &&
-              collection.links.some((link) =>
-                link.id.startsWith("starter-"),
-              ) && (
-                <div className="starter-note">
-                  <Sparkles size={15} />
+            <div className="workspace-overview" aria-label="Resumo da biblioteca">
+              <span><LayoutGrid size={15} /><strong>{ready ? collection.links.length : "—"}</strong> apps na coleção</span>
+              <span><Star size={15} /><strong>{ready ? favorites : "—"}</strong> favoritos</span>
+              <span><Folder size={15} /><strong>{ready ? collection.categories.length : "—"}</strong> categorias</span>
+              <span className="overview-note"><span /> Tudo no seu ritmo</span>
+            </div>
+            <section className="capture-box" aria-label="Adicionar por URL">
+              <div className="capture-symbol">
+                <Link2 size={23} />
+              </div>
+              <div className="capture-content">
+                <label htmlFor="quick-url">Um novo app por aí?</label>
+                <span>Cole o link e deixe o resto com a gente.</span>
+              </div>
+              <form onSubmit={quickAdd} noValidate className="capture-form">
+                <div className="url-wrap">
+                  <Link2 size={16} />
+                  <input
+                    id="quick-url"
+                    type="text"
+                    inputMode="url"
+                    autoComplete="off"
+                    placeholder="Cole a URL do app aqui..."
+                    value={quickUrl}
+                    aria-invalid={!!quickError}
+                    aria-describedby={quickError ? "quick-error" : undefined}
+                    onChange={(event) => {
+                      setQuickUrl(event.target.value);
+                      setQuickError("");
+                    }}
+                  />
+                </div>
+                <button
+                  className="button primary"
+                  disabled={!ready || !!storageError}
+                  type="submit"
+                >
+                  <Plus size={17} />
+                  <span>Adicionar</span>
+                </button>
+              </form>
+              {quickError && (
+                <p
+                  id="quick-error"
+                  className="capture-error field-error"
+                  role="alert"
+                >
+                  {quickError}
+                </p>
+              )}
+            </section>
+            {ready && favorites > 0 && view === "all" && !category && !query && (
+              <section className="favorites-shelf" aria-labelledby="favorites-title">
+                <div className="shelf-heading"><h2 id="favorites-title"><Star size={17} /> Sempre por perto</h2><button className="text-button" onClick={() => navigate("favorites")}>Ver favoritos <ArrowUpRight size={14} /></button></div>
+                <div className="favorite-shortcuts">
+                  {collection.links.filter((link) => link.favorite).slice(0, 6).map((link) => (
+                    <motion.a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="favorite-shortcut" onClick={() => recordOpen(link)} whileHover={reduceMotion ? undefined : { y: -3 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }}>
+                      <Favicon url={link.url} name={link.name} /><span>{link.name}</span><ArrowUpRight size={14} /><span className="sr-only">Abrir em nova aba</span>
+                    </motion.a>
+                  ))}
+                </div>
+              </section>
+            )}
+            <section
+              id="collection"
+              aria-labelledby="collection-title"
+              className="collection-section"
+            >
+              <div className="collection-heading">
+                <div>
+                  <h2 id="collection-title">
+                    {title}
+                    <span className="count-badge">{visible.length}</span>
+                  </h2>
                   <p>
-                    Alguns apps para começar. Edite, remova e deixe a coleção
-                    com a sua cara.
+                    {category
+                      ? "Tudo desta categoria, em um só lugar."
+                      : view === "favorites"
+                        ? "Os que você quer sempre por perto."
+                        : view === "recent"
+                          ? "Os apps que você abriu por aqui."
+                          : "Um atalho para tudo o que você usa."}
                   </p>
                 </div>
+                <div className="layout-toggle" aria-label="Visualização">
+                  <button
+                    className={layout === "grid" ? "active" : ""}
+                    aria-label="Visualização em grade"
+                    aria-pressed={layout === "grid"}
+                    title="Grade"
+                    onClick={() => preference("layout", "grid")}
+                  >
+                    <Grid2X2 size={17} />
+                  </button>
+                  <button
+                    className={layout === "list" ? "active" : ""}
+                    aria-label="Visualização em lista"
+                    aria-pressed={layout === "list"}
+                    title="Lista"
+                    onClick={() => preference("layout", "list")}
+                  >
+                    <List size={19} />
+                  </button>
+                </div>
+              </div>
+              <div className="collection-tools">
+                <div className="search-field">
+                  <Search size={18} />
+                  <input
+                    id="search"
+                    ref={searchRef}
+                    aria-label="Buscar apps"
+                    placeholder="Buscar por nome, link ou categoria..."
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
+                  {query ? (
+                    <button
+                      className="icon-button small"
+                      onClick={() => {
+                        setQuery("");
+                        searchRef.current?.focus();
+                      }}
+                      aria-label="Limpar busca"
+                    >
+                      <X size={16} />
+                    </button>
+                  ) : (
+                    <kbd>Ctrl K</kbd>
+                  )}
+                </div>
+                <div className="sort-field">
+                  <label htmlFor="sort">Ordenar por</label>
+                  <select
+                    id="sort"
+                    value={view === "recent" ? "recent" : sort}
+                    disabled={view === "recent"}
+                    onChange={(event) => preference("sort", event.target.value)}
+                  >
+                    {view === "recent" ? (
+                      <option value="recent">Último acesso</option>
+                    ) : (
+                      <>
+                        <option value="newest">Mais recentes</option>
+                        <option value="name">Nome A–Z</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+              </div>
+              {(category || view !== "all" || query) && (
+                <div className="filter-summary">
+                  <span>
+                    {visible.length}{" "}
+                    {visible.length === 1 ? "app encontrado" : "apps encontrados"}
+                    {query && ` para “${query}”`}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setQuery("");
+                      navigate("all");
+                    }}
+                    className="text-button"
+                  >
+                    Limpar filtros
+                    <X size={13} />
+                  </button>
+                </div>
               )}
-          </section>
-          <footer className="page-footer">
-            <span>
-              <ShieldCheck size={14} />
-              Sua coleção é salva automaticamente neste navegador.
-            </span>
-            <button className="text-button" onClick={() => setBackupOpen(true)}>
-              Fazer backup
-              <ArrowUpRight size={14} />
-            </button>
-          </footer>
+              {!ready ? (
+                <div className="empty-state" role="status">
+                  <span className="empty-symbol">
+                    <LayoutGrid size={25} />
+                  </span>
+                  <h3>Carregando sua coleção…</h3>
+                </div>
+              ) : visible.length > 0 ? (
+                <div
+                  className={`app-grid ${layout === "list" ? "list-view" : ""}`}
+                >
+                  <AnimatePresence initial={false}>
+                  {visible.map((link, index) => (
+                    <motion.article layout={!reduceMotion ? "position" : false} className="app-card" key={link.id}
+                      initial={{ opacity: 0, y: reduceMotion ? 0 : 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: reduceMotion ? 1 : 0.96 }}
+                      transition={{ opacity: { duration: 0.18 }, y: { duration: 0.3, delay: Math.min(index, 7) * 0.035 }, layout: { duration: 0.25 } }}
+                      whileHover={reduceMotion ? undefined : { y: -4 }}
+                    >
+                      <div className="card-top">
+                        <Favicon key={link.url} url={link.url} name={link.name} />
+                        <div className="card-actions">
+                          <button
+                            className={`icon-button favorite-button ${link.favorite ? "is-favorite" : ""}`}
+                            aria-label={
+                              link.favorite
+                                ? `Remover ${link.name} dos favoritos`
+                                : `Favoritar ${link.name}`
+                            }
+                            aria-pressed={link.favorite}
+                            title={
+                              link.favorite
+                                ? "Remover dos favoritos"
+                                : "Favoritar"
+                            }
+                            onClick={() => toggleFavorite(link)}
+                          >
+                            <Star size={16} />
+                          </button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              className="icon-button"
+                              aria-label={`Opções de ${link.name}`}
+                              title="Opções do app"
+                            >
+                              <MoreHorizontal size={19} />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="app-menu">
+                              <DropdownMenuItem onSelect={() => openEditor(link)}>
+                                <Pencil size={15} />
+                                Editar app
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() => copyLink(link.url)}
+                              >
+                                <Copy size={15} />
+                                Copiar URL
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onSelect={() => removeLink(link)}
+                              >
+                                <Trash2 size={15} />
+                                Remover app
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                      <a
+                        className="card-link"
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Abrir ${link.name} em nova aba: ${link.url}`}
+                        onClick={() => recordOpen(link)}
+                      >
+                        <h3>{link.name}</h3>
+                        <span className="card-domain">
+                          {new URL(link.url).hostname.replace(/^www\./, "")}
+                        </span>
+                        <ArrowUpRight className="open-arrow" size={17} />
+                        <span className="sr-only"> — abrir em nova aba</span>
+                      </a>
+                      <div className="card-footer">
+                        <span
+                          className={`category-pill ${categoryColors[Math.max(0, collection.categories.indexOf(link.category)) % categoryColors.length]}`}
+                        >
+                          <span />
+                          {link.category}
+                        </span>
+                      </div>
+                    </motion.article>
+                  ))}
+                  </AnimatePresence>
+                  {layout === "grid" && view === "all" && !query && (
+                    <button className="add-card" onClick={() => openEditor()}>
+                      <span>
+                        <Plus size={21} />
+                      </span>
+                      <strong>Adicionar app</strong>
+                      <small>Seu próximo atalho</small>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <span className="empty-symbol">
+                    {query ? (
+                      <Search size={26} />
+                    ) : view === "favorites" ? (
+                      <Star size={26} />
+                    ) : view === "recent" ? (
+                      <Clock3 size={26} />
+                    ) : (
+                      <LayoutGrid size={26} />
+                    )}
+                  </span>
+                  <h3>
+                    {query
+                      ? "Nenhum app encontrado"
+                      : view === "favorites"
+                        ? "Seus favoritos ficam aqui"
+                        : view === "recent"
+                          ? "Seu próximo clique começa aqui"
+                          : "Espaço para seus próximos apps"}
+                  </h3>
+                  <p>
+                    {query
+                      ? "Tente outro nome, domínio ou categoria."
+                      : view === "favorites"
+                        ? "Toque na estrela de um app para deixá-lo sempre à mão."
+                        : view === "recent"
+                          ? "Abra um app da sua biblioteca para vê-lo nesta lista."
+                          : "Cole uma URL acima ou adicione seu primeiro app."}
+                  </p>
+                  <button
+                    className="button secondary"
+                    onClick={() => {
+                      if (query) setQuery("");
+                      else if (view !== "all") navigate("all");
+                      else openEditor();
+                    }}
+                  >
+                    {query
+                      ? "Limpar busca"
+                      : view !== "all"
+                        ? "Ver todos os apps"
+                        : "Adicionar app"}
+                  </button>
+                </div>
+              )}
+              {ready &&
+                collection.links.some((link) =>
+                  link.id.startsWith("starter-"),
+                ) && (
+                  <div className="starter-note">
+                    <Sparkles size={15} />
+                    <p>
+                      Alguns apps para começar. Edite, remova e deixe a coleção
+                      com a sua cara.
+                    </p>
+                  </div>
+                )}
+            </section>
+            <footer className="page-footer">
+              <span>
+                <ShieldCheck size={14} />
+                Sua coleção é salva automaticamente neste navegador.
+              </span>
+              <button className="text-button" onClick={() => setBackupOpen(true)}>
+                Fazer backup
+                <ArrowUpRight size={14} />
+              </button>
+            </footer>
+            </>
+          ) : (
+            <VaultView section={section} />
+          )}
         </main>
       </div>
       <Modal
