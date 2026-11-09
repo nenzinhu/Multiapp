@@ -23,6 +23,14 @@ const eslintConfig = defineConfig([
       "react-hooks/set-state-in-effect": "off",
     },
   },
+  {
+    files: ["app/page.tsx"],
+    rules: {
+      // The collection is hydrated from localStorage on mount, so the initial
+      // state is set inside an effect that reads an external system.
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

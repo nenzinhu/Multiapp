@@ -6,4 +6,4 @@ Implemented: automatic domain-based name, editable names/URLs/categories, favori
 
 Data lives in browser localStorage. No authentication, server database or synchronization of collections. Hosted Site remains owner-private. Initial apps are explicitly identified as an editable starter selection. Favicons request only the URL hostname from Google's favicon endpoint; the full saved URL is not sent.
 
-Developer commands: npm run dev; npx tsc --noEmit; node --test tests/collection.test.mjs; npm run build. Runtime uses the supplied React/Vinext Sites starter. See QA.md for observed verification and limitations.
+Developer commands: npm run dev; npx tsc --noEmit; npm test; npm run lint; npm run build. Runtime uses Next.js 16 (App Router) deployed on Vercel. See QA.md for observed verification and limitations.
