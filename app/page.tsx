@@ -1,4 +1,5 @@
 "use client";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from "motion/react";
 import {
   useEffect,
@@ -49,7 +50,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Counter } from "@/components/counter";
 import { VaultView, type VaultSection } from "@/components/vault/vault-view";
+import { pop, shake } from "@/lib/animations";
 import {
   filterLinks,
   initialCollection,
@@ -184,6 +187,11 @@ export default function Home() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const quickUrlRef = useRef<HTMLInputElement>(null);
+  const [categoryListRef] = useAutoAnimate<HTMLDivElement>({
+    duration: 220,
+    easing: "ease-out",
+  });
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -224,6 +232,7 @@ export default function Home() {
       window.removeEventListener("keydown", shortcut);
     };
   }, []);
+
   function commit(
     transform: (current: Collection) => Collection,
   ): Collection | null {
@@ -292,6 +301,7 @@ export default function Home() {
       openEditor(undefined, url);
     } catch (error) {
       setQuickError((error as Error).message);
+      shake(quickUrlRef.current);
       document.getElementById("quick-url")?.focus();
     }
   }
@@ -809,9 +819,43 @@ export default function Home() {
               </div>
             )}
             <div className="workspace-overview" aria-label="Resumo da biblioteca">
-              <span><LayoutGrid size={15} /><strong>{ready ? collection.links.length : "—"}</strong> apps na coleção</span>
-              <span><Star size={15} /><strong>{ready ? favorites : "—"}</strong> favoritos</span>
-              <span><Folder size={15} /><strong>{ready ? collection.categories.length : "—"}</strong> categorias</span>
+              <span>
+                <LayoutGrid size={15} />
+                <strong>
+                  <Counter
+                    value={ready ? collection.links.length : null}
+                    id="library-links"
+                  />
+                  <span className="sr-only">
+                    {ready ? collection.links.length : "—"}
+                  </span>
+                </strong>{" "}
+                apps na coleção
+              </span>
+              <span>
+                <Star size={15} />
+                <strong>
+                  <Counter
+                    value={ready ? favorites : null}
+                    id="library-favorites"
+                  />
+                  <span className="sr-only">{ready ? favorites : "—"}</span>
+                </strong>{" "}
+                favoritos
+              </span>
+              <span>
+                <Folder size={15} />
+                <strong>
+                  <Counter
+                    value={ready ? collection.categories.length : null}
+                    id="library-categories"
+                  />
+                  <span className="sr-only">
+                    {ready ? collection.categories.length : "—"}
+                  </span>
+                </strong>{" "}
+                categorias
+              </span>
               <span className="overview-note"><span /> Tudo no seu ritmo</span>
             </div>
             <section className="capture-box" aria-label="Adicionar por URL">
@@ -827,6 +871,7 @@ export default function Home() {
                   <Link2 size={16} />
                   <input
                     id="quick-url"
+                    ref={quickUrlRef}
                     type="text"
                     inputMode="url"
                     autoComplete="off"
@@ -1011,7 +1056,10 @@ export default function Home() {
                                 ? "Remover dos favoritos"
                                 : "Favoritar"
                             }
-                            onClick={() => toggleFavorite(link)}
+                            onClick={(event) => {
+                              pop(event.currentTarget);
+                              toggleFavorite(link);
+                            }}
                           >
                             <Star size={16} />
                           </button>
@@ -1314,7 +1362,7 @@ export default function Home() {
             </p>
           )}
         </form>
-        <div className="category-list">
+        <div className="category-list" ref={categoryListRef}>
           {collection.categories.map((name, index) => (
             <div key={name}>
               <span

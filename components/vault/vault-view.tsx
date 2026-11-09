@@ -28,8 +28,12 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
+
+import { Counter } from "@/components/counter";
 import { RecordDialog, type RecordDraft } from "@/components/vault/record-dialog";
 import { AI_PROVIDERS, type AiProvider } from "@/lib/ai-providers";
+import { entrance, pop, shake } from "@/lib/animations";
 import {
   changePassphrase,
   createVault,
@@ -172,6 +176,11 @@ export function VaultView({ section }: { section: VaultSection }) {
   const [revealed, setRevealed] = React.useState<string[]>([]);
   const [busy, setBusy] = React.useState(false);
   const [unlockValue, setUnlockValue] = React.useState("");
+  const [vaultListRef] = useAutoAnimate<HTMLUListElement>({
+    duration: 240,
+    easing: "ease-out",
+  });
+  const gateRef = React.useRef<HTMLDivElement | null>(null);
   const [dialog, setDialog] = React.useState<{
     open: boolean;
     kind: "site" | "api";
@@ -189,6 +198,10 @@ export function VaultView({ section }: { section: VaultSection }) {
   React.useEffect(() => {
     setStatus(readStoredVault() ? "locked" : "setup");
   }, []);
+
+  React.useEffect(() => {
+    if (error) shake(gateRef.current);
+  }, [error]);
 
   const kind: "site" | "api" = section === "providers" ? "api" : "site";
   const isProviders = kind === "api";
@@ -444,7 +457,7 @@ export function VaultView({ section }: { section: VaultSection }) {
   function renderGate() {
     if (status === "loading")
       return (
-        <div className="vault-gate">
+        <div className="vault-gate" ref={gateRef}>
           <span className="empty-symbol">
             <Lock size={22} />
           </span>
@@ -454,7 +467,7 @@ export function VaultView({ section }: { section: VaultSection }) {
 
     if (status === "setup")
       return (
-        <div className="vault-gate">
+        <div className="vault-gate" ref={gateRef}>
           <span className="empty-symbol">
             <Lock size={22} />
           </span>
@@ -476,7 +489,7 @@ export function VaultView({ section }: { section: VaultSection }) {
       );
 
     return (
-      <div className="vault-gate">
+      <div className="vault-gate" ref={gateRef}>
         <span className="empty-symbol">
           <Lock size={22} />
         </span>
@@ -567,7 +580,10 @@ export function VaultView({ section }: { section: VaultSection }) {
                 ? "Remover dos importantes"
                 : "Marcar como importante"
             }
-            onClick={() => void handleFavorite(record)}
+            onClick={(event) => {
+                pop(event.currentTarget);
+                void handleFavorite(record);
+              }}
           >
             <Star size={16} />
           </button>
@@ -656,7 +672,10 @@ export function VaultView({ section }: { section: VaultSection }) {
           <div className="workspace-overview" aria-label="Resumo do cofre">
             <span>
               <ShieldCheck size={15} />
-              <strong>{records.length}</strong> registros guardados
+              <strong>
+                <Counter value={records.length} id="vault-records" />
+                <span className="sr-only">{records.length}</span>
+              </strong> registros guardados
             </span>
             <span>
               <Lock size={15} />
@@ -767,7 +786,7 @@ export function VaultView({ section }: { section: VaultSection }) {
               </div>
             </div>
             {visible.length ? (
-              <ul className="vault-list">{visible.map(renderRow)}</ul>
+              <ul className="vault-list" ref={vaultListRef}>{visible.map(renderRow)}</ul>
             ) : (
               <div className="empty-state">
                 <span className="empty-symbol">
@@ -879,6 +898,13 @@ function ProviderCatalog({
   onSave: (provider: AiProvider) => void;
 }) {
   const [search, setSearch] = React.useState("");
+  const gridRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const cards = gridRef.current?.querySelectorAll(".provider-card");
+    if (cards?.length) entrance(cards);
+  }, [search]);
+
   const list = AI_PROVIDERS.filter((provider) =>
     `${provider.name} ${provider.freeTier}`
       .toLocaleLowerCase("pt-BR")
@@ -909,7 +935,7 @@ function ProviderCatalog({
           onChange={(event) => setSearch(event.target.value)}
         />
       </div>
-      <div className="provider-grid">
+      <div className="provider-grid" ref={gridRef}>
         {list.map((provider) => {
           const saved = stored.find(
             (record) => record.providerId === provider.id,

@@ -26,5 +26,9 @@ The vault is a separate encrypted store (`multiapp.vault.v1`), reachable from "S
 ## Flow ledger
 Create/edit use the same modal fields and validation. Invalid submission focuses the field with a linked inline error. Closing preserves drafts until saved or explicitly canceled. Delete is reversible via a persistent Undo action; no permanent deletion workflow. Category deletion moves its links to Sem categoria and offers Undo. Search includes names, URLs, categories, ignores accents. Search/filter state lives in memory because it refers to private, browser-specific records; layout and sort preferences persist locally. Recent lists only apps actually opened here. All navigation remains on this one collection screen.
 
+## Motion
+
+Motion is functional, never decorative noise. The collection grid keeps its Motion layout transitions; AutoAnimate owns the lists that change with content (vault records, category manager) and anime.js owns the crafted moments (catalog entrance, badge count-up, error shake, favorite pop). The two never animate the same element. Every animation respects `prefers-reduced-motion`: with the setting on, the badges simply show their final value and nothing moves.
+
 ## Accessibility and recovery
 Portuguese labels. Dialog primitive provides inert background/focus trap/Escape; programmatic trigger focus is restored. Focus after deletion returns to search. Real anchors open apps in new tabs with noopener/noreferrer. Favicon fails to a letter; remote favicon provider receives only the hostname. No HTML rendering from saved strings. Native select popup is intentionally platform-owned. No network loading for collection operations, synchronous local commit feedback. Initial hydration shows a stable loading state. Empty and no-results states offer the next useful action. Backup supports browser-to-browser transfer, never implies synchronization.

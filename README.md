@@ -47,6 +47,8 @@ variable, no database and no build-time secrets.
 - `lib/ai-providers.ts` — catalog of AI providers with a free tier
 - `lib/utils.ts` — `cn()` class helper
 - `components/ui/` — shadcn primitives used by the product (dialog, menu)
+- `components/counter.tsx` — animated number badges
+- `lib/animations.ts` — anime.js helpers (entrance, shake, pop, count-up)
 - `components/vault/` — the vault screens (site passwords, AI API keys)
 - `vendor/shadcn-tailwind-4.13.0.css` — vendored shadcn base theme
 - `public/` — logo and favicon
@@ -89,6 +91,22 @@ variable, no database and no build-time secrets.
 - "Exportar" writes the encrypted envelope to a JSON file; "Importar" asks for
   the passphrase of the imported file and merges the records, keeping the ones
   already stored. Limits: 500 records per vault.
+
+## Motion
+
+Two libraries share the work, each where it is strongest:
+
+- **AutoAnimate** (`@formkit/auto-animate`) watches the lists that change with
+  content — the vault records and the category manager — and animates the
+  additions, removals and reorders with FLIP transitions. It uses the Web
+  Animations API, so nothing is left behind in the DOM.
+- **anime.js** (`animejs`) handles the crafted moments: the staggered entrance
+  of the provider catalog, the count-up of the badges ("8 apps na coleção"), the
+  shake when the master passphrase is wrong and the pop of the favorite star.
+- The library grid keeps its existing Motion layout animations, so the two
+  never fight over the same element.
+- Every animation respects `prefers-reduced-motion`: with the setting on,
+  numbers simply appear and nothing moves.
 
 ## Optional Dispatch-Owned ChatGPT Sign-In
 

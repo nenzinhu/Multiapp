@@ -32,6 +32,13 @@ ciphertext only — the secret never appears in plain text. The provider catalog
 lists 20 providers with their console links, and the key saved for a provider
 is marked as saved in the catalog.
 
+Motion verified in the browser: AutoAnimate runs FLIP transitions on the vault
+list (the row is animated on add and on remove, and the undo brings it back),
+the provider catalog enters with a staggered fade from anime.js, the badges
+count up and keep their value when the section is revisited, the master
+passphrase error shakes the gate and the favorite star pops. The reduced
+motion preference was not simulated in a browser session.
+
 Limits: no real mobile hardware/virtual-keyboard test, no screen-reader audit,
 no simulated browser storage quota failure or offline network test. The vault
 was not audited against a cryptographic review, and the free tiers listed in
