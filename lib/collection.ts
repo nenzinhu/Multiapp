@@ -38,7 +38,7 @@ export function normalizeUrl(input: string): string {
   // A leading "host:port" is not a scheme, so only treat real schemes as absolute.
   const hasScheme =
     /^[a-z][a-z\d+.-]*:/i.test(value) &&
-    !/^[\w.-]+:\d+(?:\/|$)/.test(value);
+    !/^[\w.-]+:\d+(?:[/?#]|$)/.test(value);
 
   let url: URL;
   try {
@@ -118,13 +118,12 @@ export function validateBackup(raw: unknown): Collection {
         "O backup contém um app inválido. Nenhum dado foi importado.",
       );
 
+    const category = link.category.trim();
     return {
       id: link.id,
       name: link.name.trim(),
       url: normalizeUrl(link.url),
-      category: categories.includes(link.category)
-        ? link.category
-        : UNCATEGORIZED,
+      category: categories.includes(category) ? category : UNCATEGORIZED,
       favorite: link.favorite,
       createdAt: link.createdAt,
       lastOpened: link.lastOpened,

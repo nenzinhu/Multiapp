@@ -35,6 +35,18 @@ test("normalizeUrl rejects unsafe schemes and credentials", () => {
   assert.throws(() => normalizeUrl("   "), /URL válida/);
 });
 
+test("normalizeUrl accepts host ports followed by a query or fragment", () => {
+  for (const [input, expected] of [
+    ["localhost:3000?view=all", "https://localhost:3000/?view=all"],
+    ["example.com:8080#section", "https://example.com:8080/#section"],
+    ["example.com:8080/path?q=1#section", "https://example.com:8080/path?q=1#section"],
+  ]) {
+    assert.equal(normalizeUrl(input), expected);
+  }
+  assert.throws(() => normalizeUrl("javascript:123#section"));
+  assert.throws(() => normalizeUrl("example.com:99999?view=all"));
+});
+
 test("suggestedName uses the domain label", () => {
   assert.equal(suggestedName("https://www.figma.com/"), "Figma");
   assert.equal(suggestedName("https://chatgpt.com/"), "Chatgpt");
@@ -94,6 +106,19 @@ test("mergeBackup keeps existing links and appends new ones", () => {
   assert.equal(merged.links[0].id, "a");
   assert.notEqual(merged.links[1].id, "c");
   assert.deepEqual(merged.categories, ["Design", "Trabalho"]);
+});
+
+test("validateBackup preserves category assignments after trimming whitespace", () => {
+  const valid = validateBackup({
+    version: 1,
+    categories: [" Design ", "Design"],
+    links: [link({ category: " Design " })],
+  });
+  assert.deepEqual(valid.categories, ["Design"]);
+  assert.equal(valid.links[0].category, "Design");
+  assert.equal(filterLinks(valid.links, {
+    query: "", view: "all", category: "Design", sort: "name",
+  }).length, 1);
 });
 
 test("initialCollection ships an editable starter selection", () => {
