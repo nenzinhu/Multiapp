@@ -636,15 +636,11 @@ export function VaultView({ section }: { section: VaultSection }) {
           <h1>
             {isProviders ? (
               <>
-                Chaves de API.
-                <br />
-                <span>Organizadas por provedor.</span>
+                Chaves de IA<span>.</span>
               </>
             ) : (
               <>
-                Suas senhas.
-                <br />
-                <span>Guardadas com cuidado.</span>
+                Suas senhas<span>.</span>
               </>
             )}
           </h1>

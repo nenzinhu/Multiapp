@@ -1,15 +1,15 @@
 ---
 version: alpha
 colors:
-  primary: "#0e6b57"
-  primarySoft: "#e2f0e6"
-  background: "#f2f4ec"
+  primary: "#167460"
+  primarySoft: "#e7f0ea"
+  background: "#f5f7f6"
   surface: "#ffffff"
-  text: "#13251e"
+  text: "#19352c"
   muted: "#5e7066"
-  border: "#dde4d8"
+  border: "#dfe7e2"
   focusRing: "#358878"
-  shelf: "#0c2a22"
+  shelf: "#143c32"
   highlight: "#d8f16d"
 typography:
   display:
@@ -18,7 +18,7 @@ typography:
     fontFamily: "Segoe UI Variable Text, Segoe UI, system-ui, sans-serif"
 rounded:
   card: "16px"
-  control: "12px"
+  control: "11px"
 spacing:
   unit: "4px"
 components:
@@ -28,22 +28,22 @@ components:
 ---
 
 ## Overview
-Multiapp is a personal launch shelf for Brazilian Portuguese speakers. Product register. Compact, easy to scan and practical on a phone. Signature: an interlocking four-tile lime mark on a deep forest shelf, repeated in the compact shortcut grid, recalling an app launcher. The canvas is warm paper with two faint atmospheric washes; navigation is the dark anchor. Avoid marketing hero sections, large decorative cards, dark neon dashboards and gradient-filled type.
+Multiapp is a personal launch shelf for Brazilian Portuguese speakers. Product register. Compact, easy to scan and practical on a phone. Signature: an interlocking four-tile lime mark on a deep forest shelf, repeated in the compact shortcut grid, recalling an app launcher. The canvas is a cool, pale gray; the floating forest navigation and lime active item anchor the workspace. Compact product headings keep the apps in view. Library, site passwords and AI keys share the same hierarchy. Avoid marketing hero sections, large decorative cards, dark neon dashboards and gradient-filled type.
 
 ## Colors
-The frontmatter documents the runtime palette in app/globals.css :root. CSS variables are the canonical runtime owner; all UI consumes these variables, without a second theme adapter. Primary is forest teal, the sidebar is a deeper shelf green, highlight is a soft lime used for selection and the capture action. Surfaces are white and the page is warm paper. Category dots are expressive; category names also convey their meaning. Error feedback uses a separate dark red semantic token. Focus uses `--focus-ring` (#358878), measured at 3.83:1 against the page paper and 4.25:1 on white, so the ring meets the 3:1 non-text minimum without relying on color alone.
+The frontmatter documents the runtime palette in app/globals.css :root. CSS variables are the canonical runtime owner; all UI consumes these variables, without a second theme adapter. Primary is forest teal, the sidebar is a forest shelf green, highlight is a soft lime used for the active navigation item. Surfaces are white, the capture strip is pale sage and the page is cool gray. Category dots are expressive; category names also convey their meaning. Error feedback uses a separate dark red semantic token. Focus uses `--focus-ring` (#358878), measured at 3.95:1 against the page background and 4.25:1 on white, so the ring meets the 3:1 non-text minimum without relying on color alone.
 
 ## Typography
-Segoe UI Variable for display and body keeps Windows and phone legibility with no webfont network dependency. The display face carries tight tracking on the oversized page title; body copy stays at 14px. Portuguese accents use system fallbacks. Main heading clamp(32px, 3.5vw, 48px), stepping to 34px at 800px, 31px at 560px and 29px at 480px; card title 14px, body 14px, metadata 11–12px.
+Segoe UI Variable for display and body keeps Windows and phone legibility with no webfont network dependency. The display face carries tight tracking on the oversized page title; body copy stays at 14px. Portuguese accents use system fallbacks. Main heading clamp(32px, 3.3vw, 46px), stepping to 36px at 800px, 34px at 560px and 32px at 480px; card title 15px (14px on phones), body 14px, metadata 11–12px. Headings name the current workspace rather than using a two-line slogan.
 
 ## Layout
-Desktop: 248px sidebar, 64px sticky top bar, content up to 1180px. A 4px rhythm; content padding 40px top and 34px sides. A compact two-line URL capture strip precedes the collection. The grid auto-fits cards from a 168px minimum (150px below 560px) with a 14px gutter, roughly 136px high, tightening to 84px rows below 480px. Below 800px sidebar becomes a controlled drawer, content padding 20px; below 480px cards become compact rows. List mode is a second density option, not another workflow.
+Desktop: 244px navigation inset 14px from the viewport, with a 22px radius. The main shell starts at 272px; a 76px top bar aligns with the 40px horizontal content padding. Content is capped at 1240px. A 4px rhythm unifies spacing. Summary counts use a single quiet divider. A sage URL capture strip precedes shortcuts and the app collection. The grid auto-fits cards from a 190px minimum with a 16px gutter and 176px minimum height. Below 800px navigation becomes the existing modal drawer. Below 560px favorite shortcuts become full-width rows; below 480px app cards become 94px compact rows. List mode stays a single column at every width.
 
 ## Elevation & Depth
-Subtle borders for static surfaces, a fine inset highlight on cards and one soft ambient shadow on the capture panel. Only menus/dialogs get meaningful shadow. No decorative hero media: favicons are the useful images here.
+Fine borders and nearly flat white surfaces; cards receive a small shadow on pointer hover. The floating sidebar has one quiet ambient shadow. Dialogs use a stronger shadow to establish their layer. No decorative hero media: favicons are the useful images here.
 
 ## Shapes
-16px cards, 12px controls, pill search fields, layout toggles and category pills. Favicons occupy a reserved 38px square with a letter fallback. Shared primitives own modal and menu behavior.
+16px cards, 11px buttons and search fields, 10px layout toggles and 6px category labels. Favicons occupy a reserved 42px square (38px on phones) with a letter fallback. Shared primitives own modal and menu behavior.
 
 ## Components
 Canonical map is in UX-CONTRACT.md. Controls have visible focus, hover and pressed states. The focus ring is `--focus-ring` at 3px, meeting 3:1 against every surface it lands on. On touch layouts every control reaches a 44px minimum target without enlarging its icon, and pointer-only effects sit behind `@media (hover: none)` so a tap never leaves a hover state behind. Counters use tabular numbers so digit changes do not shift the layout. Sidebar tab copy is split into characters by GSAP for a short entrance and pointer wave, always with a full visually hidden copy for assistive technology. Global scrollbar tokens apply to all containers. Dialogs fit viewport and scroll inside. Empty and error states keep navigation usable. Toast actions remain until dismissed or superseded. Reduced motion disables transitions and GSAP effects.

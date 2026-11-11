@@ -611,49 +611,50 @@ export default function Home() {
         <div className="workspace-label">SEU ESPAÇO</div>
         <nav aria-label="Biblioteca" className="main-nav">
           <button
-            className={view === "all" && !category ? "selected" : ""}
+            className={section === "library" && view === "all" && !category ? "selected" : ""}
             onClick={() => navigate("all")}
-            aria-current={view === "all" && !category ? "page" : undefined}
+            aria-current={section === "library" && view === "all" && !category ? "page" : undefined}
           >
             <LayoutGrid size={18} />
             <span className="nav-label">
               <AnimatedText
                 text="Todos os apps"
-                active={view === "all" && !category}
+                active={section === "library" && view === "all" && !category}
                 interactive
               />
             </span>
             <small>{collection.links.length}</small>
           </button>
           <button
-            className={view === "favorites" ? "selected" : ""}
+            className={section === "library" && view === "favorites" ? "selected" : ""}
             onClick={() => navigate("favorites")}
-            aria-current={view === "favorites" ? "page" : undefined}
+            aria-current={section === "library" && view === "favorites" ? "page" : undefined}
           >
             <Star size={18} />
             <span className="nav-label">
               <AnimatedText
                 text="Favoritos"
-                active={view === "favorites"}
+                active={section === "library" && view === "favorites"}
                 interactive
               />
             </span>
             <small>{favorites}</small>
           </button>
           <button
-            className={view === "recent" ? "selected" : ""}
+            className={section === "library" && view === "recent" ? "selected" : ""}
             onClick={() => navigate("recent")}
-            aria-current={view === "recent" ? "page" : undefined}
+            aria-current={section === "library" && view === "recent" ? "page" : undefined}
           >
             <Clock3 size={18} />
             <span className="nav-label">
               <AnimatedText
                 text="Recentes"
-                active={view === "recent"}
+                active={section === "library" && view === "recent"}
                 interactive
               />
             </span>
           </button>
+          <div className="nav-divider">COFRE PESSOAL</div>
           <button
             className={section === "sites" ? "selected" : ""}
             onClick={() => {
@@ -707,8 +708,8 @@ export default function Home() {
           {collection.categories.map((name, index) => (
             <button
               key={name}
-              className={category === name ? "selected" : ""}
-              aria-current={category === name ? "page" : undefined}
+              className={section === "library" && category === name ? "selected" : ""}
+              aria-current={section === "library" && category === name ? "page" : undefined}
               onClick={() => navigate("all", name)}
             >
               <span
@@ -724,9 +725,9 @@ export default function Home() {
             </button>
           ))}
           <button
-            className={category === UNCATEGORIZED ? "selected" : ""}
+            className={section === "library" && category === UNCATEGORIZED ? "selected" : ""}
             onClick={() => navigate("all", UNCATEGORIZED)}
-            aria-current={category === UNCATEGORIZED ? "page" : undefined}
+            aria-current={section === "library" && category === UNCATEGORIZED ? "page" : undefined}
           >
             <span className="category-dot gray" />
             <span className="nav-name">Sem categoria</span>
@@ -832,11 +833,11 @@ export default function Home() {
             <>
             <motion.div className="page-heading" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
               <div>
-                <div className="eyebrow">SUA INTERNET, ORGANIZADA</div>
+                <div className="eyebrow">SEU PONTO DE PARTIDA</div>
                 <h1>
-                  Menos abas.<br /><span>Mais possibilidades.</span>
+                  Sua biblioteca<span>.</span>
                 </h1>
-                <p>Seu universo de apps, em um espaço só seu.</p>
+                <p>Todos os seus apps. Um lugar para encontrar tudo.</p>
               </div>
               <button
                 className="button primary add-top"
@@ -896,7 +897,7 @@ export default function Home() {
                 </strong>{" "}
                 categorias
               </span>
-              <span className="overview-note"><span /> Tudo no seu ritmo</span>
+              <span className="overview-note"><span /> Organizado por você</span>
             </div>
             <section className="capture-box" aria-label="Adicionar por URL">
               <div className="capture-symbol" aria-hidden="true">
@@ -912,11 +913,11 @@ export default function Home() {
                 )}
               </div>
               <div className="capture-content">
-                <label htmlFor="quick-url">Um novo app por aí?</label>
+                <label htmlFor="quick-url">Salve seu próximo atalho</label>
                 <span className={quickPreview ? "capture-hint has-preview" : "capture-hint"}>
                   {quickPreview
                     ? `${quickPreview.name} · ${quickPreview.host}`
-                    : "Cole o link e deixe o resto com a gente."}
+                    : "Cole um link para adicionar à biblioteca."}
                 </span>
               </div>
               <form onSubmit={quickAdd} noValidate className="capture-form">
@@ -968,7 +969,7 @@ export default function Home() {
             </section>
             {ready && favorites > 0 && view === "all" && !category && !query && (
               <section className="favorites-shelf" aria-labelledby="favorites-title">
-                <div className="shelf-heading"><h2 id="favorites-title"><Star size={17} /> Sempre por perto</h2><button className="text-button" onClick={() => navigate("favorites")}>Ver favoritos <ArrowUpRight size={14} /></button></div>
+                <div className="shelf-heading"><h2 id="favorites-title"><Star size={17} /> Seus favoritos</h2><button className="text-button" onClick={() => navigate("favorites")}>Ver favoritos <ArrowUpRight size={14} /></button></div>
                 <div className="favorite-shortcuts">
                   {collection.links.filter((link) => link.favorite).slice(0, 6).map((link) => (
                     <motion.a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="favorite-shortcut" onClick={() => recordOpen(link)} whileHover={reduceMotion ? undefined : { y: -3 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }}>
