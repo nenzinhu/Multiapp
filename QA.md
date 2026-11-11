@@ -46,3 +46,18 @@ the provider catalog change over time. JSON import
 merge and validation tested at the model level; browser file-picker import not
 exercised. Collection is local to each browser, without cloud synchronization.
 Remote favicon availability depends on the provider.
+
+## 2026 refresh: editorial forest, GSAP tabs, favicon preview
+
+TypeScript (`npx tsc --noEmit`) passed. Lint reports no errors and one advisory
+warning for the remote favicon `<img>` in `components/site-favicon.tsx`. Unit
+tests remain at 18/18. `npm run build` (Next.js 16.3.4) prerendered `/` and
+`/_not-found` as static content. Headless Chrome (Playwright, 1280x900 and
+390x844) verified the new palette at both widths with no horizontal overflow and
+no console errors: the split labels (`tab-label` / `tab-char`) reach their final
+state, the pointer wave moves the characters and returns them, pasting
+`github.com` fills `Github · github.com` and shows the favicon in the capture
+symbol and input, the editor opens with the normalized URL and the same favicon,
+and `prefers-reduced-motion` keeps every character still and visible. The
+favicon providers are network dependent and fall back to the app initial; real
+mobile hardware and screen-reader audits remain untested.

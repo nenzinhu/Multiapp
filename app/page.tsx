@@ -50,7 +50,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { AnimatedText } from "@/components/animated-text";
 import { Counter } from "@/components/counter";
+import { SiteFavicon } from "@/components/site-favicon";
 import { VaultView, type VaultSection } from "@/components/vault/vault-view";
 import { pop, shake } from "@/lib/animations";
 import {
@@ -89,26 +91,6 @@ function Logo() {
       <span>
         multiapp<span className="brand-period">.</span>
       </span>
-    </span>
-  );
-}
-function Favicon({ url, name }: { url: string; name: string }) {
-  const [failed, setFailed] = useState(false);
-  return (
-    <span className="favicon">
-      {failed ? (
-        <span aria-hidden="true">{name.charAt(0).toUpperCase()}</span>
-      ) : (
-        <img
-          src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(new URL(url).hostname)}&sz=64`}
-          alt=""
-          width="28"
-          height="28"
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          onError={() => setFailed(true)}
-        />
-      )}
     </span>
   );
 }
@@ -591,6 +573,38 @@ export default function Home() {
       : view === "recent"
         ? "Acessados recentemente"
         : "Todos os apps");
+  const sectionTitle =
+    section === "sites"
+      ? "Senhas de sites"
+      : section === "providers"
+        ? "Chaves de IA"
+        : "Biblioteca";
+  const quickPreview = useMemo(() => {
+    if (!quickUrl.trim()) return null;
+    try {
+      const url = normalizeUrl(quickUrl);
+      return {
+        url,
+        host: new URL(url).hostname.replace(/^www\./, ""),
+        name: suggestedName(url),
+      };
+    } catch {
+      return null;
+    }
+  }, [quickUrl]);
+  const editorPreview = useMemo(() => {
+    if (!editor?.url.trim()) return null;
+    try {
+      const url = normalizeUrl(editor.url);
+      return {
+        url,
+        host: new URL(url).hostname.replace(/^www\./, ""),
+        name: suggestedName(url),
+      };
+    } catch {
+      return null;
+    }
+  }, [editor]);
   function sidebarContent() {
     return (
       <>
@@ -602,7 +616,13 @@ export default function Home() {
             aria-current={view === "all" && !category ? "page" : undefined}
           >
             <LayoutGrid size={18} />
-            <span>Todos os apps</span>
+            <span className="nav-label">
+              <AnimatedText
+                text="Todos os apps"
+                active={view === "all" && !category}
+                interactive
+              />
+            </span>
             <small>{collection.links.length}</small>
           </button>
           <button
@@ -611,7 +631,13 @@ export default function Home() {
             aria-current={view === "favorites" ? "page" : undefined}
           >
             <Star size={18} />
-            <span>Favoritos</span>
+            <span className="nav-label">
+              <AnimatedText
+                text="Favoritos"
+                active={view === "favorites"}
+                interactive
+              />
+            </span>
             <small>{favorites}</small>
           </button>
           <button
@@ -620,7 +646,13 @@ export default function Home() {
             aria-current={view === "recent" ? "page" : undefined}
           >
             <Clock3 size={18} />
-            <span>Recentes</span>
+            <span className="nav-label">
+              <AnimatedText
+                text="Recentes"
+                active={view === "recent"}
+                interactive
+              />
+            </span>
           </button>
           <button
             className={section === "sites" ? "selected" : ""}
@@ -631,7 +663,13 @@ export default function Home() {
             aria-current={section === "sites" ? "page" : undefined}
           >
             <KeyRound size={18} />
-            <span>Senhas de sites</span>
+            <span className="nav-label">
+              <AnimatedText
+                text="Senhas de sites"
+                active={section === "sites"}
+                interactive
+              />
+            </span>
           </button>
           <button
             className={section === "providers" ? "selected" : ""}
@@ -642,7 +680,13 @@ export default function Home() {
             aria-current={section === "providers" ? "page" : undefined}
           >
             <Bot size={18} />
-            <span>Chaves de IA</span>
+            <span className="nav-label">
+              <AnimatedText
+                text="Chaves de IA"
+                active={section === "providers"}
+                interactive
+              />
+            </span>
           </button>
         </nav>
         <div className="category-heading">
@@ -763,11 +807,7 @@ export default function Home() {
             <span>Meu espaço</span>
             <ChevronRight size={14} />
             <strong>
-              {section === "sites"
-                ? "Senhas de sites"
-                : section === "providers"
-                  ? "Chaves de IA"
-                  : "Biblioteca"}
+              <AnimatedText text={sectionTitle} />
             </strong>
           </div>
           <span className="save-status">
@@ -859,16 +899,38 @@ export default function Home() {
               <span className="overview-note"><span /> Tudo no seu ritmo</span>
             </div>
             <section className="capture-box" aria-label="Adicionar por URL">
-              <div className="capture-symbol">
-                <Link2 size={23} />
+              <div className="capture-symbol" aria-hidden="true">
+                {quickPreview ? (
+                  <SiteFavicon
+                    url={quickPreview.url}
+                    name={quickPreview.name}
+                    size={40}
+                    eager
+                  />
+                ) : (
+                  <Link2 size={23} />
+                )}
               </div>
               <div className="capture-content">
                 <label htmlFor="quick-url">Um novo app por aí?</label>
-                <span>Cole o link e deixe o resto com a gente.</span>
+                <span className={quickPreview ? "capture-hint has-preview" : "capture-hint"}>
+                  {quickPreview
+                    ? `${quickPreview.name} · ${quickPreview.host}`
+                    : "Cole o link e deixe o resto com a gente."}
+                </span>
               </div>
               <form onSubmit={quickAdd} noValidate className="capture-form">
                 <div className="url-wrap">
-                  <Link2 size={16} />
+                  {quickPreview ? (
+                    <SiteFavicon
+                      url={quickPreview.url}
+                      name={quickPreview.name}
+                      size={22}
+                      eager
+                    />
+                  ) : (
+                    <Link2 size={16} />
+                  )}
                   <input
                     id="quick-url"
                     ref={quickUrlRef}
@@ -910,7 +972,7 @@ export default function Home() {
                 <div className="favorite-shortcuts">
                   {collection.links.filter((link) => link.favorite).slice(0, 6).map((link) => (
                     <motion.a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="favorite-shortcut" onClick={() => recordOpen(link)} whileHover={reduceMotion ? undefined : { y: -3 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }}>
-                      <Favicon url={link.url} name={link.name} /><span>{link.name}</span><ArrowUpRight size={14} /><span className="sr-only">Abrir em nova aba</span>
+                      <SiteFavicon url={link.url} name={link.name} /><span>{link.name}</span><ArrowUpRight size={14} /><span className="sr-only">Abrir em nova aba</span>
                     </motion.a>
                   ))}
                 </div>
@@ -924,7 +986,7 @@ export default function Home() {
               <div className="collection-heading">
                 <div>
                   <h2 id="collection-title">
-                    {title}
+                    <AnimatedText text={title} />
                     <span className="count-badge">{visible.length}</span>
                   </h2>
                   <p>
@@ -1041,7 +1103,7 @@ export default function Home() {
                       whileHover={reduceMotion ? undefined : { y: -4 }}
                     >
                       <div className="card-top">
-                        <Favicon key={link.url} url={link.url} name={link.name} />
+                        <SiteFavicon key={link.url} url={link.url} name={link.name} />
                         <div className="card-actions">
                           <button
                             className={`icon-button favorite-button ${link.favorite ? "is-favorite" : ""}`}
@@ -1224,7 +1286,19 @@ export default function Home() {
         {editor && (
           <form noValidate onSubmit={saveLink} className="editor-form">
             <div className="field">
-              <label htmlFor="link-url">URL do app</label>
+              <div className="field-label">
+                <label htmlFor="link-url">URL do app</label>
+                {editorPreview && (
+                  <span className="field-site">
+                    <SiteFavicon
+                      url={editorPreview.url}
+                      name={editorPreview.name}
+                      size={18}
+                    />
+                    <span>{editorPreview.host}</span>
+                  </span>
+                )}
+              </div>
               <input
                 id="link-url"
                 autoFocus

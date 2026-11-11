@@ -43,3 +43,8 @@ yarn-error.log*
 
 # OS metadata
 .DS_Store
+
+# Local dev server output and publication archives
+dev-server*.log
+/multiapp-deploy.tar.gz
+

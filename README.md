@@ -48,6 +48,10 @@ variable, no database and no build-time secrets.
 - `lib/utils.ts` — `cn()` class helper
 - `components/ui/` — shadcn primitives used by the product (dialog, menu)
 - `components/counter.tsx` — animated number badges
+- `components/animated-text.tsx` — GSAP split-text for the sidebar tabs,
+  breadcrumb and collection title
+- `components/site-favicon.tsx` — favicon with provider fallback and letter
+  fallback, used by cards and by the live paste preview
 - `lib/animations.ts` — anime.js helpers (entrance, shake, pop, count-up)
 - `components/vault/` — the vault screens (site passwords, AI API keys)
 - `vendor/shadcn-tailwind-4.13.0.css` — vendored shadcn base theme
@@ -64,8 +68,10 @@ variable, no database and no build-time secrets.
 - Corrupt storage is never silently overwritten.
 - Import is all-or-nothing validated, merges by normalized URL and preserves
   existing records. Limits: 5 MB per file, 2.000 links, 100 categories.
-- Favicons are requested from Google's favicon endpoint using only the
-  hostname; the full saved URL is never sent.
+- Favicons are requested from Google's and DuckDuckGo's public icon endpoints
+  using only the hostname; the full saved URL is never sent. When both sources
+  fail, the card shows the app initial. The paste strip previews the favicon
+  as soon as the URL is valid, before the app is added.
 - The initial selection is an editable starter set, explicitly labeled as
   such.
 
@@ -96,6 +102,11 @@ variable, no database and no build-time secrets.
 
 Two libraries share the work, each where it is strongest:
 
+- **GSAP** (`gsap` + `@gsap/react`) animates the copy of the sidebar tabs. The
+  visible label is split into words and characters: the active tab replays a
+  staggered entrance and hovering runs a short wave. The breadcrumb and the
+  collection title reuse the same split text. The full string stays available
+  to assistive technology through a visually hidden copy.
 - **AutoAnimate** (`@formkit/auto-animate`) watches the lists that change with
   content — the vault records and the category manager — and animates the
   additions, removals and reorders with FLIP transitions. It uses the Web
@@ -106,7 +117,7 @@ Two libraries share the work, each where it is strongest:
 - The library grid keeps its existing Motion layout animations, so the two
   never fight over the same element.
 - Every animation respects `prefers-reduced-motion`: with the setting on,
-  numbers simply appear and nothing moves.
+  numbers simply appear, tab text stays still and nothing moves.
 
 ## Optional Dispatch-Owned ChatGPT Sign-In
 
