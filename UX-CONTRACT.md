@@ -34,3 +34,11 @@ Motion is functional, never decorative noise. The collection grid keeps its Moti
 
 ## Accessibility and recovery
 Portuguese labels. Dialog primitive provides inert background/focus trap/Escape; programmatic trigger focus is restored. Focus after deletion returns to search. Real anchors open apps in new tabs with noopener/noreferrer. Favicon fails to a letter; remote favicon providers receive only the hostname. The favicon preview appears in the capture strip and editor as soon as the URL validates. No HTML rendering from saved strings. Native select popup is intentionally platform-owned. No network loading for collection operations, synchronous local commit feedback. Initial hydration shows a stable loading state. Empty and no-results states offer the next useful action. Backup supports browser-to-browser transfer, never implies synchronization.
+
+## Library discovery tools
+
+Search combines whitespace-separated terms with AND. `#text` matches a category, `@domain` matches that host or its subdomains, `is:favorito` requires a favorite, and `is:nunca` requires no recorded opening. Unknown commands remain plain search text. “Esquecidos primeiro” sorts by oldest last opening, with never-opened links first; creation date breaks ties. Recent view keeps its existing last-opened order.
+
+Focus mode is session-only and hides navigation, counts, capture and favorite shortcuts only in the library. “Sair do foco” stays visible with search and list controls. It does not modify saved data.
+
+Markdown copying includes exactly the currently filtered library links, with escaped labels. It never includes vault data. Clipboard failures show existing error feedback. Optional tracker cleanup in the link editor removes only `utm_*`, `fbclid`, `gclid`, `dclid`, `msclkid`, `mc_cid` and `mc_eid`; other query parameters and fragments remain. The edited URL is not persisted until the normal save action.

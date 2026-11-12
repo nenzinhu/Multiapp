@@ -57,6 +57,8 @@ import { VaultView, type VaultSection } from "@/components/vault/vault-view";
 import { pop, shake } from "@/lib/animations";
 import {
   filterLinks,
+  cleanTrackingUrl,
+  linksToMarkdown,
   initialCollection,
   mergeBackup,
   normalizeUrl,
@@ -149,6 +151,7 @@ export default function Home() {
   const [section, setSection] = useState<"library" | VaultSection>("library");
   const [category, setCategory] = useState("");
   const [query, setQuery] = useState("");
+  const [focusMode, setFocusMode] = useState(false);
   const [sort, setSort] = useState("newest");
   const [layout, setLayout] = useState("grid");
   const [quickUrl, setQuickUrl] = useState("");
@@ -181,7 +184,8 @@ export default function Home() {
       if (!raw) localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       setCollection(data);
       if (localStorage.getItem("multiapp.layout") === "list") setLayout("list");
-      if (localStorage.getItem("multiapp.sort") === "name") setSort("name");
+      const savedSort = localStorage.getItem("multiapp.sort");
+      if (savedSort === "name" || savedSort === "forgotten") setSort(savedSort);
     } catch {
       setStorageError(
         "Não foi possível ler ou salvar a coleção. Libere o armazenamento do navegador e recarregue. Os dados existentes não foram alterados.",
@@ -783,7 +787,7 @@ export default function Home() {
   }
   return (
     <MotionConfig reducedMotion="user" transition={{ duration: 0.24, ease: "easeOut" }}>
-    <div className="app-shell">
+    <div className={`app-shell ${focusMode && section === "library" ? "focus-mode" : ""}`}>
       <a className="skip-link" href="#collection">
         Ir para os apps
       </a>
@@ -1021,6 +1025,19 @@ export default function Home() {
                   </button>
                 </div>
               </div>
+              <div className="library-actions">
+                <button className="button secondary" aria-pressed={focusMode} onClick={() => setFocusMode(!focusMode)}>
+                  <LayoutGrid size={16} />{focusMode ? "Sair do foco" : "Modo foco"}
+                </button>
+                <button className="button secondary" disabled={!ready || visible.length === 0} onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(linksToMarkdown(visible));
+                    notify(`${visible.length} links copiados em Markdown.`);
+                  } catch {
+                    setNotice({ message: "Não foi possível copiar. Permita acesso à área de transferência e tente novamente.", error: true });
+                  }
+                }}><Copy size={16} />Copiar lista em Markdown</button>
+              </div>
               <div className="collection-tools">
                 <div className="search-field">
                   <Search size={18} />
@@ -1028,6 +1045,7 @@ export default function Home() {
                     id="search"
                     ref={searchRef}
                     aria-label="Buscar apps"
+                    aria-describedby="search-commands"
                     placeholder="Buscar por nome, link ou categoria..."
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
@@ -1061,11 +1079,16 @@ export default function Home() {
                       <>
                         <option value="newest">Mais recentes</option>
                         <option value="name">Nome A–Z</option>
+                        <option value="forgotten">Esquecidos primeiro</option>
                       </>
                     )}
                   </select>
                 </div>
               </div>
+              <details className="search-commands" id="search-commands">
+                <summary>Busque do seu jeito</summary>
+                <p>Combine palavras com <code>#design</code> (categoria), <code>@github.com</code> (domínio), <code>is:favorito</code> ou <code>is:nunca</code> (nunca aberto por aqui). Use “Esquecidos primeiro” para reencontrar apps que você deixou de lado.</p>
+              </details>
               {(category || view !== "all" || query) && (
                 <div className="filter-summary">
                   <span>
@@ -1333,6 +1356,18 @@ export default function Home() {
               <p id="url-help" className="field-help">
                 O favicon é carregado automaticamente pelo domínio.
               </p>
+              <button type="button" className="text-button clean-link" onClick={() => {
+                try {
+                  const clean = cleanTrackingUrl(editor.url);
+                  const original = normalizeUrl(editor.url);
+                  setEditor({ ...editor, url: clean });
+                  setFieldError(null);
+                  notify(clean === original ? "Nenhum rastreador conhecido neste link." : "Rastreadores removidos. Confira o link antes de salvar.");
+                } catch (error) {
+                  setFieldError({ field: "url", message: (error as Error).message });
+                  document.getElementById("link-url")?.focus();
+                }
+              }}>Limpar rastreadores do link</button>
               {fieldError?.field === "url" && (
                 <p id="link-url-error" className="field-error" role="alert">
                   {fieldError.message}

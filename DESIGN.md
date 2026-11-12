@@ -50,3 +50,5 @@ Canonical map is in UX-CONTRACT.md. Controls have visible focus, hover and press
 
 ## Do's and Don'ts
 Keep add/open actions obvious. Keep search and filters independent. Never imply cloud sync: data stays in the current browser. Always label the initial selection as editable starter apps. Never make card hover the only way to find its menu. Never animate the tab labels in a way that changes their measured width or removes their accessible name.
+
+Library utility actions use the existing secondary buttons. Focus mode keeps the same card density and centers the content at 1100px; its exit action remains in the collection toolbar. Search commands use an expandable native details element, so help stays available without dominating the library.

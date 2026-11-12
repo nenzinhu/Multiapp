@@ -2166,3 +2166,23 @@ h2 { font-size: 21px; letter-spacing: -0.5px; }
 @media (prefers-reduced-motion: reduce) {
   .tab-char { transform: none !important; opacity: 1 !important; }
 }
+
+/* Library tools share the existing controls and responsive shell. */
+.library-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.library-actions .button { font-size: 12px; }
+.library-actions [aria-pressed="true"] { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
+.search-commands { margin: -4px 0 20px; color: var(--muted-foreground); font-size: 12px; }
+.search-commands summary { cursor: pointer; width: fit-content; padding: 7px 0; }
+.search-commands summary:hover { color: var(--primary); }
+.search-commands summary:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 3px; border-radius: 4px; }
+.search-commands p { max-width: 720px; line-height: 1.8; padding: 8px 0; }
+.search-commands code { color: var(--primary); font-size: 11px; }
+.clean-link { margin-top: 6px; min-height: 36px; }
+.focus-mode .sidebar, .focus-mode .topbar, .focus-mode .workspace-overview,
+.focus-mode .capture-box, .focus-mode .favorites-shelf { display: none; }
+.focus-mode .main-shell { margin-left: 0; }
+.focus-mode main { max-width: 1100px; }
+@media (max-width: 560px) {
+  .library-actions { gap: 8px; }
+  .library-actions .button { padding: 9px 12px; font-size: 11px; }
+}

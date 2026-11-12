@@ -176,19 +176,31 @@ export function filterLinks(
   links: AppLink[],
   options: FilterOptions,
 ): AppLink[] {
-  const query = fold(options.query.trim());
+  const terms = fold(options.query.trim()).split(/\s+/).filter(Boolean);
   return links
     .filter(
       (link) =>
         (!options.category || link.category === options.category) &&
         (options.view !== "favorites" || link.favorite) &&
         (options.view !== "recent" || link.lastOpened > 0) &&
-        (!query ||
-          fold(`${link.name} ${link.url} ${link.category}`).includes(query)),
+        terms.every((term) => {
+          if (term === "is:favorito") return link.favorite;
+          if (term === "is:nunca") return link.lastOpened === 0;
+          if (term.startsWith("#") && term.length > 1)
+            return fold(link.category).includes(term.slice(1));
+          if (term.startsWith("@") && term.length > 1) {
+            const host = fold(new URL(link.url).hostname);
+            const domain = term.slice(1);
+            return host === domain || host.endsWith(`.${domain}`);
+          }
+          return fold(`${link.name} ${link.url} ${link.category}`).includes(term);
+        }),
     )
     .sort((a, b) =>
       options.view === "recent"
         ? b.lastOpened - a.lastOpened
+        : options.sort === "forgotten"
+          ? a.lastOpened - b.lastOpened || a.createdAt - b.createdAt
         : options.sort === "name"
           ? a.name.localeCompare(b.name, "pt-BR")
           : b.createdAt - a.createdAt,
@@ -227,4 +239,24 @@ export function initialCollection(): Collection {
       lastOpened: 0,
     })),
   };
+}
+
+/** Removes only known tracking parameters; functional query values stay intact. */
+export function cleanTrackingUrl(input: string): string {
+  const url = new URL(normalizeUrl(input));
+  const tracking = new Set(["fbclid", "gclid", "dclid", "msclkid", "mc_cid", "mc_eid"]);
+  for (const key of [...url.searchParams.keys()]) {
+    if (key.toLowerCase().startsWith("utm_") || tracking.has(key.toLowerCase()))
+      url.searchParams.delete(key);
+  }
+  return url.href;
+}
+
+/** A portable text list containing only the library links selected by the user. */
+export function linksToMarkdown(links: AppLink[]): string {
+  return links.map((link) => {
+    const name = link.name.replace(/\s+/g, " ").replace(/[\\[\]]/g, "\\$&");
+    const url = link.url.replace(/</g, "%3C").replace(/>/g, "%3E");
+    return `- [${name}](<${url}>)`;
+  }).join("\n");
 }

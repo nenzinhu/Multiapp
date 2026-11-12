@@ -127,3 +127,28 @@ test("initialCollection ships an editable starter selection", () => {
   assert.equal(starter.links.length, 8);
   assert.ok(starter.categories.includes("Produtividade"));
 });
+
+test("search combines category, domain and favorite commands", () => {
+  const options = { query: '#design @figma.com is:favorito', view: 'all', category: '', sort: 'name' };
+  const links = [link({id:'a',name:'Figma',url:'https://figma.com/',category:'Design',favorite:true}),link({id:'b',url:'https://other.com/figma.com',category:'Design',favorite:true})];
+  assert.deepEqual(filterLinks(links,options).map(x=>x.id),['a']);
+  assert.equal(filterLinks(links,{...options,query:'is:nunca'}).length,2);
+});
+
+test("forgotten ordering puts never opened apps first without mutating input", () => {
+  const links=[link({id:'recent',lastOpened:100}),link({id:'never',lastOpened:0}),link({id:'old',lastOpened:20})];
+  assert.deepEqual(filterLinks(links,{query:'',view:'all',category:'',sort:'forgotten'}).map(x=>x.id),['never','old','recent']);
+  assert.equal(links[0].id,'recent');
+});
+
+test("tracking cleanup preserves functional parameters and fragment", async () => {
+  const { cleanTrackingUrl }=await import('../lib/collection.ts');
+  assert.equal(cleanTrackingUrl('example.com/watch?v=123&utm_source=news&fbclid=abc#play'),'https://example.com/watch?v=123#play');
+  assert.equal(cleanTrackingUrl('example.com/?ref=invite&token=123'),'https://example.com/?ref=invite&token=123');
+});
+
+test("Markdown export escapes labels and keeps links on one line", async () => {
+  const { linksToMarkdown }=await import('../lib/collection.ts');
+  assert.equal(linksToMarkdown([link({name:'[Meu] app\nlegal',url:'https://example.com/a(b)'})]),'- [\\[Meu\\] app legal](<https://example.com/a(b)>)');
+  assert.equal(linksToMarkdown([]),'');
+});
