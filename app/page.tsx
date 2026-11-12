@@ -21,10 +21,13 @@ import {
   Folder,
   FolderPlus,
   Grid2X2,
+  ImageDown,
+  ImageUp,
   KeyRound,
   LayoutGrid,
   Link2,
   List,
+  Loader2,
   Menu,
   MoreHorizontal,
   Pencil,
@@ -55,6 +58,7 @@ import { Counter } from "@/components/counter";
 import { SiteFavicon } from "@/components/site-favicon";
 import { VaultView, type VaultSection } from "@/components/vault/vault-view";
 import { pop, shake } from "@/lib/animations";
+import { ICON_UPLOAD_ACCEPT, iconFromFavicon, iconFromFile } from "@/lib/icon";
 import {
   filterLinks,
   cleanTrackingUrl,
@@ -78,9 +82,21 @@ type Editor = {
   name: string;
   category: string;
   favorite: boolean;
+  /** Image included with the link; absent means the automatic domain favicon. */
+  icon?: string;
 };
 const EMPTY: Collection = { version: 1, categories: [], links: [] };
 const categoryColors = ["blue", "orange", "violet", "green", "pink"];
+
+/** Hostname of a URL being typed, or null while the field is incomplete. */
+function hostOf(value: string): string | null {
+  try {
+    return new URL(normalizeUrl(value)).hostname;
+  } catch {
+    return null;
+  }
+}
+
 function Logo() {
   return (
     <span className="brand">
@@ -158,6 +174,9 @@ export default function Home() {
   const [quickError, setQuickError] = useState("");
   const [editor, setEditor] = useState<Editor | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [iconBusy, setIconBusy] = useState(false);
+  const [iconError, setIconError] = useState("");
+  const [includeFavicon, setIncludeFavicon] = useState(true);
   const [fieldError, setFieldError] = useState<{
     field: string;
     message: string;
@@ -173,6 +192,7 @@ export default function Home() {
   const searchRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const quickUrlRef = useRef<HTMLInputElement>(null);
+  const iconInputRef = useRef<HTMLInputElement>(null);
   const [categoryListRef] = useAutoAnimate<HTMLDivElement>({
     duration: 220,
     easing: "ease-out",
@@ -186,6 +206,9 @@ export default function Home() {
       if (localStorage.getItem("multiapp.layout") === "list") setLayout("list");
       const savedSort = localStorage.getItem("multiapp.sort");
       if (savedSort === "name" || savedSort === "forgotten") setSort(savedSort);
+      setIncludeFavicon(
+        localStorage.getItem("multiapp.include-favicon") !== "off",
+      );
     } catch {
       setStorageError(
         "Não foi possível ler ou salvar a coleção. Libere o armazenamento do navegador e recarregue. Os dados existentes não foram alterados.",
@@ -259,8 +282,21 @@ export default function Home() {
       notify("Preferência aplicada somente nesta sessão.");
     }
   }
-  function openEditor(link?: AppLink, url = "") {
+  function toggleIncludeFavicon(value: boolean) {
+    setIncludeFavicon(value);
+    try {
+      localStorage.setItem("multiapp.include-favicon", value ? "on" : "off");
+    } catch {
+      notify("Preferência aplicada somente nesta sessão.");
+    }
+  }
+  function openEditor(
+    link?: AppLink,
+    url = "",
+    options: { includeFavicon?: boolean } = {},
+  ) {
     setFieldError(null);
+    setIconError("");
     setEditor(
       link
         ? {
@@ -269,6 +305,7 @@ export default function Home() {
             name: link.name,
             category: link.category,
             favorite: link.favorite,
+            icon: link.icon,
           }
         : {
             url,
@@ -278,13 +315,58 @@ export default function Home() {
           },
     );
     setEditorOpen(true);
+    // The capture strip can bring the site favicon along with the pasted link.
+    if (!link && options.includeFavicon && url) void captureFavicon(url, true);
+  }
+  /** Captures the favicon through the icon proxy and stores it in the draft. */
+  async function captureFavicon(url: string, silent = false) {
+    let target: string;
+    try {
+      target = normalizeUrl(url);
+    } catch {
+      return;
+    }
+    setIconBusy(true);
+    setIconError("");
+    try {
+      const icon = await iconFromFavicon(target);
+      setEditor((current) => {
+        if (!current) return current;
+        try {
+          return normalizeUrl(current.url) === target
+            ? { ...current, icon }
+            : current;
+        } catch {
+          return current;
+        }
+      });
+    } catch (error) {
+      if (!silent) setIconError((error as Error).message);
+    } finally {
+      setIconBusy(false);
+    }
+  }
+  /** Uses an uploaded image as the icon of the draft. */
+  async function uploadFavicon(file: File | undefined) {
+    if (!file) return;
+    setIconBusy(true);
+    setIconError("");
+    try {
+      const icon = await iconFromFile(file);
+      setEditor((current) => (current ? { ...current, icon } : current));
+    } catch (error) {
+      setIconError((error as Error).message);
+    } finally {
+      setIconBusy(false);
+      if (iconInputRef.current) iconInputRef.current.value = "";
+    }
   }
   function quickAdd(event: FormEvent) {
     event.preventDefault();
     try {
       const url = normalizeUrl(quickUrl);
       setQuickError("");
-      openEditor(undefined, url);
+      openEditor(undefined, url, { includeFavicon });
     } catch (error) {
       setQuickError((error as Error).message);
       shake(quickUrlRef.current);
@@ -330,7 +412,8 @@ export default function Home() {
           latest.url !== editor.link.url ||
           latest.name !== editor.link.name ||
           latest.category !== editor.link.category ||
-          latest.favorite !== editor.link.favorite
+          latest.favorite !== editor.link.favorite ||
+          latest.icon !== editor.link.icon
         ) {
           reason =
             "Este app mudou em outra aba. Feche e abra a edição novamente.";
@@ -350,6 +433,7 @@ export default function Home() {
         lastOpened:
           current.links.find((item) => item.id === editor.link?.id)
             ?.lastOpened || 0,
+        ...(editor.icon ? { icon: editor.icon } : {}),
       };
       return {
         ...current,
@@ -923,6 +1007,17 @@ export default function Home() {
                     ? `${quickPreview.name} · ${quickPreview.host}`
                     : "Cole um link para adicionar à biblioteca."}
                 </span>
+                <label className="capture-toggle">
+                  <input
+                    type="checkbox"
+                    checked={includeFavicon}
+                    onChange={(event) =>
+                      toggleIncludeFavicon(event.target.checked)
+                    }
+                  />
+                  <ImageDown size={13} aria-hidden="true" />
+                  Incluir favicon junto do link
+                </label>
               </div>
               <form onSubmit={quickAdd} noValidate className="capture-form">
                 <div className="url-wrap">
@@ -977,7 +1072,7 @@ export default function Home() {
                 <div className="favorite-shortcuts">
                   {collection.links.filter((link) => link.favorite).slice(0, 6).map((link) => (
                     <motion.a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="favorite-shortcut" onClick={() => recordOpen(link)} whileHover={reduceMotion ? undefined : { y: -3 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }}>
-                      <SiteFavicon url={link.url} name={link.name} /><span>{link.name}</span><ArrowUpRight size={14} /><span className="sr-only">Abrir em nova aba</span>
+                      <SiteFavicon url={link.url} name={link.name} icon={link.icon} /><span>{link.name}</span><ArrowUpRight size={14} /><span className="sr-only">Abrir em nova aba</span>
                     </motion.a>
                   ))}
                 </div>
@@ -1127,7 +1222,12 @@ export default function Home() {
                       whileHover={reduceMotion ? undefined : { y: -4 }}
                     >
                       <div className="card-top">
-                        <SiteFavicon key={link.url} url={link.url} name={link.name} />
+                        <SiteFavicon
+                          key={`${link.url}-${link.icon ? "icon" : "auto"}`}
+                          url={link.url}
+                          name={link.name}
+                          icon={link.icon}
+                        />
                         <div className="card-actions">
                           <button
                             className={`icon-button favorite-button ${link.favorite ? "is-favorite" : ""}`}
@@ -1317,6 +1417,7 @@ export default function Home() {
                     <SiteFavicon
                       url={editorPreview.url}
                       name={editorPreview.name}
+                      icon={editor.icon}
                       size={18}
                     />
                     <span>{editorPreview.host}</span>
@@ -1333,8 +1434,18 @@ export default function Home() {
                 maxLength={4096}
                 value={editor.url}
                 onChange={(event) => {
-                  setEditor({ ...editor, url: event.target.value });
+                  const hostBefore = hostOf(editor.url);
+                  const hostAfter = hostOf(event.target.value);
+                  // A different site means the included image no longer matches.
+                  const keepIcon =
+                    !hostBefore || !hostAfter || hostBefore === hostAfter;
+                  setEditor({
+                    ...editor,
+                    url: event.target.value,
+                    icon: keepIcon ? editor.icon : undefined,
+                  });
                   setFieldError(null);
+                  if (!keepIcon) setIconError("");
                 }}
                 onBlur={() => {
                   if (!editor.name) {
@@ -1354,7 +1465,8 @@ export default function Home() {
                 }
               />
               <p id="url-help" className="field-help">
-                O favicon é carregado automaticamente pelo domínio.
+                O favicon automático consulta apenas o domínio, sem enviar o
+                endereço completo.
               </p>
               <button type="button" className="text-button clean-link" onClick={() => {
                 try {
@@ -1374,6 +1486,87 @@ export default function Home() {
                 </p>
               )}
             </div>
+            <div className="field icon-field">
+              <span className="field-label" id="icon-label">
+                Ícone do app
+              </span>
+              <div
+                className="icon-picker"
+                role="group"
+                aria-labelledby="icon-label"
+              >
+                <SiteFavicon
+                  url={editorPreview?.url ?? ""}
+                  name={editor.name || editorPreview?.name || "?"}
+                  icon={editor.icon}
+                  size={44}
+                  eager
+                />
+                <div className="icon-picker-copy">
+                  <strong>
+                    {editor.icon
+                      ? "Imagem incluída neste link"
+                      : "Favicon automático"}
+                  </strong>
+                  <p className="field-help">
+                    {editor.icon
+                      ? "A imagem fica salva com o app e aparece mesmo sem internet."
+                      : "Carregado pelo domínio. Inclua o favicon para guardá-lo junto do link."}
+                  </p>
+                  <div className="icon-actions">
+                    <button
+                      type="button"
+                      className="icon-action"
+                      disabled={iconBusy || !editorPreview}
+                      onClick={() => void captureFavicon(editor.url)}
+                    >
+                      {iconBusy ? (
+                        <Loader2 size={13} className="spin" aria-hidden="true" />
+                      ) : (
+                        <ImageDown size={13} aria-hidden="true" />
+                      )}
+                      {iconBusy
+                        ? "Preparando imagem…"
+                        : editor.icon
+                          ? "Trocar pelo favicon do site"
+                          : "Incluir favicon"}
+                    </button>
+                    <label className="icon-action icon-upload">
+                      <ImageUp size={13} aria-hidden="true" />
+                      Enviar imagem
+                      <input
+                        ref={iconInputRef}
+                        type="file"
+                        accept={ICON_UPLOAD_ACCEPT}
+                        aria-label="Enviar uma imagem para o ícone do app"
+                        onChange={(event) =>
+                          void uploadFavicon(event.target.files?.[0])
+                        }
+                      />
+                    </label>
+                    {editor.icon && (
+                      <button
+                        type="button"
+                        className="icon-action"
+                        onClick={() => {
+                          setEditor({ ...editor, icon: undefined });
+                          setIconError("");
+                        }}
+                      >
+                        <X size={13} aria-hidden="true" />
+                        Usar automático
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {iconError && (
+                <p className="field-error" role="alert">
+                  {iconError}
+                </p>
+              )}
+            </div>
+
             <div className="field">
               <label htmlFor="link-name">Nome do app</label>
               <input

@@ -20,6 +20,7 @@ function link(overrides = {}) {
     favorite: overrides.favorite ?? false,
     createdAt: overrides.createdAt ?? 1,
     lastOpened: overrides.lastOpened ?? 0,
+    ...("icon" in overrides ? { icon: overrides.icon } : {}),
   };
 }
 
@@ -151,4 +152,44 @@ test("Markdown export escapes labels and keeps links on one line", async () => {
   const { linksToMarkdown }=await import('../lib/collection.ts');
   assert.equal(linksToMarkdown([link({name:'[Meu] app\nlegal',url:'https://example.com/a(b)'})]),'- [\\[Meu\\] app legal](<https://example.com/a(b)>)');
   assert.equal(linksToMarkdown([]),'');
+});
+
+const ICON =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==";
+
+test("isIconDataUrl accepts only small, self-contained images", async () => {
+  const { isIconDataUrl, normalizeIcon, MAX_ICON_LENGTH } = await import("../lib/collection.ts");
+  assert.equal(isIconDataUrl(ICON), true);
+  assert.equal(isIconDataUrl("data:image/webp;base64,UklGRg=="), true);
+  assert.equal(normalizeIcon(ICON), ICON);
+  assert.equal(normalizeIcon(undefined), undefined);
+  assert.equal(normalizeIcon("https://exemplo.com/favicon.ico"), undefined);
+  assert.equal(normalizeIcon("javascript:alert(1)"), undefined);
+  assert.equal(normalizeIcon("data:text/html;base64,PHNjcmlwdD4="), undefined);
+  assert.equal(isIconDataUrl(`data:image/png;base64,${"A".repeat(MAX_ICON_LENGTH)}`), false);
+});
+
+test("validateBackup keeps valid icons and drops broken ones", () => {
+  const valid = validateBackup({
+    version: 1,
+    categories: ["Design"],
+    links: [
+      link({ id: "a", icon: ICON }),
+      link({ id: "b", url: "https://b.test/", icon: "http://tracker.test/pixel.png" }),
+    ],
+  });
+  assert.equal(valid.links[0].icon, ICON);
+  assert.equal(valid.links[1].icon, undefined);
+  assert.equal("icon" in valid.links[1], false);
+});
+
+test("mergeBackup carries the icon of imported apps", () => {
+  const current = { version: 1, categories: [], links: [] };
+  const imported = validateBackup({
+    version: 1,
+    categories: [],
+    links: [link({ id: "a", icon: ICON })],
+  });
+  const merged = mergeBackup(current, imported);
+  assert.equal(merged.links[0].icon, ICON);
 });

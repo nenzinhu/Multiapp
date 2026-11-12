@@ -1,6 +1,15 @@
 export const STORAGE_KEY = "multiapp.collection.v1";
 export const UNCATEGORIZED = "Sem categoria";
 
+/**
+ * A saved icon is a self-contained raster image encoded as a data URL, so the
+ * app keeps its image even when the site or the icon provider goes away. The
+ * cap keeps the whole collection inside the localStorage budget.
+ */
+export const MAX_ICON_LENGTH = 64 * 1024;
+const ICON_PATTERN =
+  /^data:image\/(?:png|jpeg|webp|gif|x-icon);base64,[a-z0-9+/]+={0,2}$/i;
+
 export type AppLink = {
   id: string;
   name: string;
@@ -9,6 +18,8 @@ export type AppLink = {
   favorite: boolean;
   createdAt: number;
   lastOpened: number;
+  /** Optional icon included with the link: the site favicon or an uploaded image. */
+  icon?: string;
 };
 
 export type Collection = {
@@ -28,6 +39,23 @@ export type FilterOptions = {
 
 const MAX_LINKS = 2000;
 const MAX_CATEGORIES = 100;
+
+/** True for a self-contained icon image inside the storage budget. */
+export function isIconDataUrl(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length <= MAX_ICON_LENGTH &&
+    ICON_PATTERN.test(value)
+  );
+}
+
+/**
+ * Icons are optional decoration: anything that is not a valid, small enough
+ * data URL is dropped instead of blocking the whole collection.
+ */
+export function normalizeIcon(value: unknown): string | undefined {
+  return isIconDataUrl(value) ? value : undefined;
+}
 
 /** Accepts a pasted URL, rejects unsafe schemes and credentialed addresses. */
 export function normalizeUrl(input: string): string {
@@ -119,6 +147,7 @@ export function validateBackup(raw: unknown): Collection {
       );
 
     const category = link.category.trim();
+    const icon = normalizeIcon(link.icon);
     return {
       id: link.id,
       name: link.name.trim(),
@@ -127,6 +156,7 @@ export function validateBackup(raw: unknown): Collection {
       favorite: link.favorite,
       createdAt: link.createdAt,
       lastOpened: link.lastOpened,
+      ...(icon ? { icon } : {}),
     } satisfies AppLink;
   });
 

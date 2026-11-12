@@ -1,9 +1,9 @@
 # Multiapp
 
 Personal webapp link organizer in Brazilian Portuguese. Paste a URL, keep the
-favicons, organize by category and keep favorites one click away. The whole
-collection lives in the browser (`localStorage`): no account, no server
-database, no sync.
+favicons — or attach your own image — organize by category and keep favorites
+one click away. The whole collection lives in the browser (`localStorage`): no
+account, no server database, no sync.
 
 Built with [Next.js](https://nextjs.org) (App Router) and Tailwind CSS v4,
 deployed on Vercel.
@@ -21,7 +21,7 @@ deployed on Vercel.
 | `npm run build`   | Production build (`.next/`)                          |
 | `npm start`       | Serves the production build locally                 |
 | `npm run lint`    | ESLint (Next.js core-web-vitals + TypeScript rules)  |
-| `npm test`        | Unit tests for the collection model (`node --test`)  |
+| `npm test`        | Unit tests for the collection, vault and icon proxy   |
 
 ## Deployment on Vercel
 
@@ -31,7 +31,9 @@ deployed on Vercel.
 3. Node.js `22.x` or newer satisfies the `engines` field in `package.json`.
 
 Every page is statically prerendered, so the deployment needs no environment
-variable, no database and no build-time secrets.
+variable, no database and no build-time secrets. The only server code is the
+stateless `/api/favicon` proxy (a Vercel function) that the icon capture calls;
+it keeps nothing between requests.
 
 ## Included shape
 
@@ -50,13 +52,17 @@ variable, no database and no build-time secrets.
 - `components/counter.tsx` — animated number badges
 - `components/animated-text.tsx` — GSAP split-text for the sidebar tabs,
   breadcrumb and collection title
-- `components/site-favicon.tsx` — favicon with provider fallback and letter
-  fallback, used by cards and by the live paste preview
+- `components/site-favicon.tsx` — app icon: the image stored with the link,
+  the provider fallback and the letter fallback; used by cards and previews
+- `lib/icon.ts` — icon pipeline: favicon capture through the proxy, uploaded
+  image handling, square PNG encoding for storage
+- `app/api/favicon/route.ts` — stateless favicon proxy used by the icon
+  capture (public hosts only, 8 s budget, 512 KB cap)
 - `lib/animations.ts` — anime.js helpers (entrance, shake, pop, count-up)
 - `components/vault/` — the vault screens (site passwords, AI API keys)
 - `vendor/shadcn-tailwind-4.13.0.css` — vendored shadcn base theme
 - `public/` — logo and favicon
-- `tests/` — unit tests for the collection and the vault
+- `tests/` — unit tests for the collection, the vault and the icon proxy
 
 ## Data rules
 
@@ -72,8 +78,44 @@ variable, no database and no build-time secrets.
   using only the hostname; the full saved URL is never sent. When both sources
   fail, the card shows the app initial. The paste strip previews the favicon
   as soon as the URL is valid, before the app is added.
+- A link can also carry its own icon (`icon`), stored as a `data:image/...`
+  data URL of at most 64 KB inside the record. It is either the site favicon
+  captured through `/api/favicon?domain=<host>` or an uploaded image (PNG, JPG,
+  WEBP, GIF, SVG or ICO, up to 2 MB) that the browser redraws as a 96×96 PNG.
+  Stored icons win over the providers, work offline and travel with the JSON
+  backup. Invalid, oversized or non-image values are dropped on read instead of
+  breaking the collection.
+- The icon proxy only reaches public hosts: IP literals, `localhost`, private,
+  link-local and reserved ranges are refused before any request, redirects are
+  re-checked, and the response is capped at 512 KB with a 8 s budget. It stores
+  nothing and never receives the saved URL, only the hostname.
+- The capture strip keeps an "Incluir favicon junto do link" preference
+  (`multiapp.include-favicon`); with it on, the favicon is captured as soon as
+  the pasted link opens in the editor. Changing the URL to another hostname
+  drops the included image, and "Usar automático" goes back to the provider.
 - The initial selection is an editable starter set, explicitly labeled as
   such.
+
+## Ícones dos apps: favicon incluído ou imagem enviada
+
+Every app shows an icon. There are three ways to get one:
+
+- **Automático** (default): the card loads the site favicon from Google's and
+  DuckDuckGo's public endpoints using only the hostname, and falls back to the
+  app initial. Nothing is stored with the link.
+- **Incluir favicon**: the editor asks the internal `/api/favicon` proxy for the
+  site icon, redraws it as a 96×96 PNG and saves it inside the link. From then
+  on the card uses that image — even without internet — and the JSON backup
+  carries it.
+- **Enviar imagem**: pick a local file (PNG, JPG, WEBP, GIF, SVG or ICO, up to
+  2 MB). The browser redraws it, keeping the aspect ratio, and stores it the
+  same way.
+
+In the paste strip, "Incluir favicon junto do link" (remembered between visits)
+does the capture as soon as the pasted URL opens the editor. The editor shows
+the current state ("Favicon automático" or "Imagem incluída neste link"), lets
+you swap the favicon, send another image or go back to automatic, and reports
+failures inline, in Portuguese, without blocking the save.
 
 ## Cofre: senhas de sites e chaves de API
 
