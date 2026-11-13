@@ -347,3 +347,23 @@ antigo (247x176 px na largura de referencia) virou um tile compacto com favicon
 Limites: a medicao de "70%" foi feita por area do card contra a largura da
 captura do usuario; em telas muito largas o `1fr` alarga os tiles e a densidade
 cai um pouco. Nao testado em leitor de tela apos a mudanca de menu.
+
+## 2026 refresh: tiles +15% (ajuste fino da densidade)
+
+Pedido: aumentar uns 15% em relação aos tiles compactos anteriores. Ajuste
+linear no conteudo do tile (altura, icone, fonte, paddings e menu), mantendo as
+6 colunas no desktop:
+
+| Medida | Antes | Agora |
+| --- | --- | --- |
+| Tile desktop | 148x38 | **147x44** (area +15%) |
+| Colunas em 1280px | 6 | 6 |
+| Icone / fonte / ponto | 22 / 12 / 5 | 25 / 13 / 6 |
+| Menu e alvo de toque | 24 / 44 | 26 / 48 |
+| Celular (390, touch) | 2 colunas de ~170x46 | 2 colunas de 171x50 |
+| Lista | 77px | 79px |
+
+O tile "Adicionar app" acompanhou (147x44, rotulo em uma linha) e a grade manteve
+o gap de 9px. Medido no Chromium 1280x900 e 390x844: 6 e 2 colunas, sem
+overflow horizontal, sem erros de console; `tsc`, `lint`, `npm test` (43) e
+`build` sem erros.
