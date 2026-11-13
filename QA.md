@@ -61,3 +61,88 @@ symbol and input, the editor opens with the normalized URL and the same favicon,
 and `prefers-reduced-motion` keeps every character still and visible. The
 favicon providers are network dependent and fall back to the app initial; real
 mobile hardware and screen-reader audits remain untested.
+
+## 2026 refresh: conta, banco de dados e sincronização
+
+Pedido: "um banco de dados que quando digitar o usuário e senha puxa todos os
+apps, independente do computador ou mobile". Entrega: contas com usuário e
+senha, biblioteca por conta em SQLite (`node:sqlite`), sessão em cookie HttpOnly
+e sincronização por snapshot com revisão.
+
+Unidade: `npm test` com 39 testes aprovados (15 novos em `tests/accounts`). Cobrem
+hash scrypt e verificação em tempo constante, sal único, senha acentuada em NFD,
+unicidade de usuário sem diferenciar maiúsculas, regras de usuário e senha,
+rejeição de credenciais sem revelar qual campo falhou, sessão criada/lida/
+apagada, sessão expirada, coleção vazia na revisão 0, normalização do payload
+(`figma.com` → `https://figma.com/`), conflito de revisão sem sobrescrever o
+outro aparelho, payload inválido preservando a cópia anterior, isolamento entre
+contas e leitura da mesma coleção a partir de uma segunda sessão.
+
+API: verificada com `curl` contra o build de produção (`npm start`, banco em
+`/tmp`). `GET /api/auth/me` anônimo → `{"user":null}`; cadastro devolve 201 com
+cookie `HttpOnly`; `PUT /api/collection` grava a revisão 1; um segundo jar de
+cookies entra com o mesmo par (usuário em maiúsculas) e recebe a mesma coleção;
+`PUT` com revisão antiga responde 409 com a cópia do servidor; senha errada →
+401 com mensagem genérica; `POST /api/auth/logout` limpa o cookie e a coleção
+passa a responder 401; 11 tentativas erradas seguidas terminam em 429.
+
+Navegador (Playwright, Chromium, 1280x900 e 390x844): a tela de login abre em
+ambos os tamanhos, criar conta entra direto na biblioteca com a seleção inicial
+de 8 apps, adicionar `linear.app` mostra "Linear" e "Sincronizado", um contexto
+novo de celular entra com o mesmo usuário e vê os 9 apps, o menu da conta mostra
+`marina` com "Sair da conta", sair volta ao login, senha errada mostra "Usuário
+ou senha incorretos", e recarregar a página no desktop mantém os 9 apps. Nenhum
+erro de console além do 401 esperado da senha errada.
+
+Limites: sem aparelho físico, sem auditoria de leitor de tela, sem teste de duas
+abas editando ao mesmo tempo (o caminho de conflito foi coberto no nível de API e
+de unidade). O limite de tentativas é em memória, por instância do processo. O
+banco fica em disco: em hospedagem serverless (Vercel) é preciso um volume
+persistente ou um driver externo, caso contrário a API responde 503. O cofre de
+senhas e chaves de IA continua local e não sincroniza.
+
+## 2026 refresh: Postgres (Supabase) como banco real
+
+Pedido: usar o banco Postgres do Supabase como armazenamento. O host direto
+`db.hoeqxhogarzuotthlyxh.supabase.co` só publica AAAA (IPv6), sem registro A, e
+este ambiente não tem rota IPv6; a conexão foi feita pelo pooler IPv4
+`aws-1-us-east-1.pooler.supabase.com:6543` com o usuário
+`postgres.hoeqxhogarzuotthlyxh` e `sslmode=require`. A URL fica em `.env.local`
+(ignorado pelo git) e em nenhum arquivo versionado.
+
+Arquitetura: o armazenamento virou um contrato assíncrono em
+`lib/server/accounts.ts` com duas implementações — `sqlite-store.ts` (local, sem
+dependências) e `postgres-store.ts` (`pg`, pool, DDL idempotente). `store.ts`
+escolhe pelo ambiente, então rotas, telas e testes usam a mesma API.
+
+Unidade: `npm test` com 40 testes aprovados e 1 ignorado sem
+`TEST_DATABASE_URL`. Cobrem o parser de URL (senha com `@` cru, `%40`
+codificado, `sslmode=disable`), além de todos os casos anteriores migrados para
+a API assíncrona.
+
+Integração real: `TEST_DATABASE_URL` apontando para o Supabase criou o schema
+temporário `multiapp_test`, criou as tabelas, cadastrou conta, rejeitou usuário
+duplicado e senha errada, autenticou, abriu duas sessões, gravou a coleção na
+revisão 1, recusou revisão antiga com 409, leu a mesma coleção pela segunda
+sessão, isolou outra conta e apagou a sessão. O schema foi removido ao final
+(2/2 aprovados).
+
+API no build de produção conectada ao Supabase (`npm start`, `.env.local`):
+cadastro 201, `PUT /api/collection` revisão 1, segundo cookie jar lendo a mesma
+coleção, 409 com a cópia atual, logout 401. Conferido direto no Postgres: as
+linhas de `users`, `sessions` e `collections` existiam (marina.pg com 1.422 bytes
+de snapshot e 2 sessões).
+
+Navegador (Playwright, 1280x900 e 390x844) contra o Postgres: criar conta abre a
+biblioteca com 8 apps e "Sincronizado", adicionar `supabase.com` mostra
+"Supabase", o mesmo login no viewport de celular vê o app criado no desktop e
+nenhum erro de console apareceu.
+
+Limpeza: as contas de teste (`teste.pg`, `marina.pg`) e suas sessões/coleções
+foram apagadas; o banco ficou com 0 contas e 0 coleções, com as tabelas criadas
+no schema `public`.
+
+Limites: a URL direta (IPv6) não foi testada; o pooler de transação foi o único
+caminho validado. Sem `DATABASE_URL` o app continua usando SQLite. O pool tem no
+máximo 4 conexões por processo e o limite de tentativas de login segue em
+memória, por instância.

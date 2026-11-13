@@ -1,4 +1,9 @@
 export const STORAGE_KEY = "multiapp.collection.v1";
+/** Per-account browser cache: a fast first paint, never the source of truth. */
+export const CACHE_PREFIX = "multiapp.collection.v2.";
+export function cacheKey(userId: string): string {
+  return `${CACHE_PREFIX}${userId}`;
+}
 export const UNCATEGORIZED = "Sem categoria";
 
 export type AppLink = {
