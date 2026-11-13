@@ -1,73 +1,152 @@
 # Multiapp
 
 Personal webapp link organizer in Brazilian Portuguese. Paste a URL, keep the
-favicons, organize by category and keep favorites one click away. The whole
-collection lives in the browser (`localStorage`): no account, no server
-database, no sync.
+favicons, organize by category and keep favorites one click away.
 
-Built with [Next.js](https://nextjs.org) (App Router) and Tailwind CSS v4,
-deployed on Vercel.
+The collection belongs to an **account**: type the username and password and the
+same apps open on any computer, tablet or phone. Accounts, password hashes,
+sessions and the app library live in a server-side SQLite database
+(`node:sqlite`), and the browser keeps only a per-account cache for a fast first
+paint. The personal vault (site passwords and AI keys) stays encrypted in the
+browser and never reaches the server.
+
+Built with [Next.js](https://nextjs.org) (App Router) and Tailwind CSS v4.
 
 ## Prerequisites
 
-- Node.js `>=22.13.0`
+- Node.js `>=22.13.0` (Node 24 recommended: `node:sqlite` is stable there)
 - npm (the lockfile is authoritative: `npm ci` for a reproducible install)
 
 ## Commands
 
-| Command           | What it does                                        |
-| ----------------- | --------------------------------------------------- |
-| `npm run dev`     | Development server on `http://localhost:3000`        |
-| `npm run build`   | Production build (`.next/`)                          |
-| `npm start`       | Serves the production build locally                 |
-| `npm run lint`    | ESLint (Next.js core-web-vitals + TypeScript rules)  |
-| `npm test`        | Unit tests for the collection model (`node --test`)  |
+| Command           | What it does                                          |
+| ----------------- | ----------------------------------------------------- |
+| `npm run dev`     | Development server on `http://localhost:3000`          |
+| `npm run build`   | Production build (`.next/`)                            |
+| `npm start`       | Serves the production build locally                    |
+| `npm run lint`    | ESLint (Next.js core-web-vitals + TypeScript rules)    |
+| `npm test`        | Unit tests for collection, vault, accounts and sync    |
 
-## Deployment on Vercel
+## Accounts, database and sync
 
-1. Import the repository in Vercel.
-2. Keep the defaults: framework **Next.js**, build command `npm run build`,
-   output directory `.next`.
-3. Node.js `22.x` or newer satisfies the `engines` field in `package.json`.
+- `POST /api/auth/register` creates the account and signs it in.
+- `POST /api/auth/login` checks the pair and returns the account.
+- `POST /api/auth/logout` deletes the session of that device only.
+- `GET /api/auth/me` tells the UI whether the cookie still points at a session.
+- `GET /api/collection` returns the whole library of the signed account.
+- `PUT /api/collection` stores the whole library with a revision check.
 
-Every page is statically prerendered, so the deployment needs no environment
-variable, no database and no build-time secrets.
+How the pieces fit:
+
+- Passwords are hashed with **scrypt** (N=16384, r=8, p=1, 64-byte key, random
+  salt). The hash carries its own parameters, so the cost can grow later.
+- Sessions use an **HttpOnly, SameSite=Lax cookie**; only the SHA-256 of the
+  random token is stored, valid for 30 days. `Secure` is set whenever the
+  request arrives over HTTPS.
+- Sign-in is throttled per IP + username (10 failures in 10 minutes).
+- The whole library is one JSON snapshot with a **revision number**. A stale
+  revision answers `409` with the server copy, and the client merges instead of
+  overwriting another device's edits.
+- The browser keeps `multiapp.collection.v2.<userId>`, a per-account cache. The
+  server copy always wins on load, and the cache is never shared between
+  accounts. A collection from the previous browser-only version
+  (`multiapp.collection.v1`) is migrated into the account on the first sign-in
+  of an empty account.
+
+### Database
+
+| Variable             | Default             | Meaning                                        |
+| -------------------- | ------------------- | ---------------------------------------------- |
+| `DATABASE_URL`       | —                   | Postgres/Supabase URL; used when present       |
+| `MULTIAPP_DB_FILE`   | `.data/multiapp.db` | SQLite file when `DATABASE_URL` is absent      |
+| `TEST_DATABASE_URL`  | —                   | Enables the Postgres integration test          |
+| `PORT`               | `3000`              | Port used by `npm start`                       |
+
+`lib/server/store.ts` picks the driver: Postgres when `DATABASE_URL` (or
+`POSTGRES_URL` / `SUPABASE_DB_URL`) is set, SQLite otherwise. Both implement the
+same `Storage` contract in `lib/server/accounts.ts`, and both create their
+tables on first use. The SQLite file and its `-wal`/`-shm` companions hold
+`users`, `sessions` and `collections`; back up that folder and the accounts move
+with it.
+
+#### Supabase
+
+Supabase's project page offers three connection strings:
+
+- **Direct** (`db.<ref>.supabase.co:5432`) is IPv6-only on new projects, so it
+  fails on most IPv4-only hosts (and on Vercel).
+- **Session pooler** (`aws-0-<region>.pooler.supabase.com:5432`).
+- **Transaction pooler** (`aws-1-<region>.pooler.supabase.com:6543`) — the one
+  used here; copy it from *Connect* and keep `?sslmode=require`.
+
+The password may contain `@` or `%`; the app accepts the raw string as copied
+from the dashboard and also the percent-encoded form (`@` → `%40`). `sslmode`
+other than `disable`/`allow` turns TLS on with `rejectUnauthorized: false`, which
+is what Supabase's pooler certificate requires.
+
+Transactions in the collection write (`BEGIN` … `SELECT … FOR UPDATE` … `COMMIT`)
+run on a single connection, so they are safe behind the transaction pooler. No
+prepared-statement names, `LISTEN` or session state are used.
+
+## Deployment
+
+With `DATABASE_URL` pointing at Supabase (or any Postgres), the app runs on any
+Node host — including serverless platforms such as Vercel — because no local
+disk is needed. Set the variable in the hosting dashboard, deploy with the
+defaults (framework **Next.js**, build `npm run build`), and the first request
+creates the three tables.
+
+Without `DATABASE_URL` the app falls back to SQLite and needs a writable disk
+(VPS, Docker, Railway, Fly.io, Render with a volume). On Vercel the filesystem
+is read-only and discarded between requests, so SQLite there answers `503` with
+an actionable message instead of pretending to save.
 
 ## Included shape
 
-- `app/page.tsx` — the whole product UI (collection, editor dialog, card
-  menu, categories, backup dialog)
+- `app/page.tsx` — the library UI (collection, editor dialog, card menu,
+  categories, backup dialog) plus the account and sync glue
 - `app/layout.tsx` — document shell and metadata
-- `app/globals.css` — design tokens and the custom styles of the product
+- `app/globals.css` — design tokens and the custom styles of the product,
+  including the account gate
+- `app/api/auth/*` — register, login, logout and session probe
+- `app/api/collection/route.ts` — read and write the account library
+- `lib/server/db.ts` — SQLite connection, schema and file location
+- `lib/server/accounts.ts` — shared types, rules, errors and the `Storage` contract
+- `lib/server/sqlite-store.ts` — SQLite implementation of the storage contract
+- `lib/server/postgres-store.ts` — Postgres/Supabase implementation, URL parsing,
+  schema creation and TLS
+- `lib/server/password.ts` — scrypt hashing and constant-time verification
+- `lib/server/store.ts` — picks Postgres or SQLite from the environment
+- `lib/server/http.ts` — cookies, JSON guards, session lookup, API errors
+- `lib/server/rate-limit.ts` — in-memory sign-in throttle
+- `lib/account.ts` — typed browser client for the API above
+- `components/auth/auth-screen.tsx` — sign-in / create account screen
+- `components/logo.tsx` — the four-tile mark shared by shelf and login
 - `app/chatgpt-auth.ts` — optional dispatch-owned ChatGPT sign-in helpers
 - `lib/collection.ts` — the collection model: normalization, validation,
-  filtering, backup merge
+  filtering, backup merge, per-account cache key
 - `lib/vault.ts` — the encrypted vault: AES-GCM + PBKDF2, record validation,
   backup merge
 - `lib/ai-providers.ts` — catalog of AI providers with a free tier
-- `lib/utils.ts` — `cn()` class helper
 - `components/ui/` — shadcn primitives used by the product (dialog, menu)
-- `components/counter.tsx` — animated number badges
-- `components/animated-text.tsx` — GSAP split-text for the sidebar tabs,
-  breadcrumb and collection title
-- `components/site-favicon.tsx` — favicon with provider fallback and letter
-  fallback, used by cards and by the live paste preview
-- `lib/animations.ts` — anime.js helpers (entrance, shake, pop, count-up)
+- `components/counter.tsx`, `components/animated-text.tsx`,
+  `components/site-favicon.tsx` — motion and favicon components
 - `components/vault/` — the vault screens (site passwords, AI API keys)
-- `vendor/shadcn-tailwind-4.13.0.css` — vendored shadcn base theme
-- `public/` — logo and favicon
-- `tests/` — unit tests for the collection and the vault
+- `tests/` — unit tests for the collection, the vault and the accounts
 
 ## Data rules
 
 - Only `http`/`https` URLs are accepted, without embedded credentials.
-- Every mutation re-reads the current `localStorage` snapshot and commits
-  atomically before the UI updates.
-- Storage events refresh other tabs; edits refuse to overwrite a record that
-  changed elsewhere.
-- Corrupt storage is never silently overwritten.
+- The server validates every snapshot with the same rules as the browser
+  (`lib/collection.ts`), so a handcrafted request cannot store junk.
+- Each mutation updates the local copy first and then sends the snapshot with
+  the last seen revision, so the UI never waits on the network.
+- Another device's write is never overwritten silently: the API answers `409`
+  with the newer copy and the two are merged once before saving.
+- A per-account cache keeps the first paint instant and survives a reload; the
+  server copy replaces it on load, so a cleared browser loses nothing.
 - Import is all-or-nothing validated, merges by normalized URL and preserves
-  existing records. Limits: 5 MB per file, 2.000 links, 100 categories.
+  existing records. Limits: 5 MB per request, 2.000 links, 100 categories.
 - Favicons are requested from Google's and DuckDuckGo's public icon endpoints
   using only the hostname; the full saved URL is never sent. When both sources
   fail, the card shows the app initial. The paste strip previews the favicon
@@ -82,6 +161,8 @@ variable, no database and no build-time secrets.
 - The vault lives in its own `localStorage` key (`multiapp.vault.v1`) and holds
   only ciphertext: records are sealed with AES-GCM-256 and the key is derived
   from the master passphrase with PBKDF2-HMAC-SHA256 (210.000 rounds).
+- The vault is deliberately **not** synced with the account: it stays on this
+  browser, so no secret ever reaches the server.
 - The master passphrase is never stored. If it is forgotten the records
   cannot be recovered — export the vault regularly.
 - The vault starts locked on every page load and can be locked again with the

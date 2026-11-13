@@ -17,6 +17,9 @@
 next-env.d.ts
 *.tsbuildinfo
 
+# Local database (SQLite file, WAL and SHM companions)
+/.data/
+
 # Test output
 /coverage/
 
@@ -28,6 +31,7 @@ yarn-error.log*
 
 # Local environment and keys
 .env*
+!.env.example
 .dev.vars*
 *.pem
 

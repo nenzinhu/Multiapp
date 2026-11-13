@@ -25,10 +25,12 @@ import {
   LayoutGrid,
   Link2,
   List,
+  LogOut,
   Menu,
   MoreHorizontal,
   Pencil,
   Plus,
+  RefreshCw,
   Search,
   ShieldCheck,
   Sparkles,
@@ -51,11 +53,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AnimatedText } from "@/components/animated-text";
+import { AuthBoot, AuthScreen } from "@/components/auth/auth-screen";
 import { Counter } from "@/components/counter";
+import { Logo } from "@/components/logo";
 import { SiteFavicon } from "@/components/site-favicon";
 import { VaultView, type VaultSection } from "@/components/vault/vault-view";
+import {
+  ApiError,
+  fetchSession,
+  pullCollection,
+  pushCollection,
+  signOut,
+  type AccountUser,
+  type RemoteCollection,
+} from "@/lib/account";
 import { pop, shake } from "@/lib/animations";
 import {
+  cacheKey,
   filterLinks,
   cleanTrackingUrl,
   linksToMarkdown,
@@ -72,6 +86,7 @@ import {
 
 type View = "all" | "favorites" | "recent";
 type Notice = { message: string; error?: boolean; undo?: () => void };
+type SyncState = "idle" | "loading" | "saving" | "synced" | "offline" | "conflict";
 type Editor = {
   link?: AppLink;
   url: string;
@@ -81,21 +96,6 @@ type Editor = {
 };
 const EMPTY: Collection = { version: 1, categories: [], links: [] };
 const categoryColors = ["blue", "orange", "violet", "green", "pink"];
-function Logo() {
-  return (
-    <span className="brand">
-      <span className="brand-mark" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-        <i />
-      </span>
-      <span>
-        multiapp<span className="brand-period">.</span>
-      </span>
-    </span>
-  );
-}
 function Modal({
   open,
   onOpenChange,
@@ -146,7 +146,11 @@ export default function Home() {
   const reduceMotion = useReducedMotion();
   const [collection, setCollection] = useState<Collection>(EMPTY);
   const [ready, setReady] = useState(false);
-  const [storageError, setStorageError] = useState("");
+  const [session, setSession] = useState<AccountUser | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [authNotice, setAuthNotice] = useState("");
+  const [syncState, setSyncState] = useState<SyncState>("idle");
+  const [syncError, setSyncError] = useState("");
   const [view, setView] = useState<View>("all");
   const [section, setSection] = useState<"library" | VaultSection>("library");
   const [category, setCategory] = useState("");
@@ -173,36 +177,58 @@ export default function Home() {
   const searchRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const quickUrlRef = useRef<HTMLInputElement>(null);
+  const collectionRef = useRef<Collection>(EMPTY);
+  const sessionRef = useRef<AccountUser | null>(null);
+  const revisionRef = useRef(0);
+  const pendingRef = useRef<Collection | null>(null);
+  const savingRef = useRef(false);
+  const saveTimerRef = useRef<number | null>(null);
+  const savedRef = useRef("");
   const [categoryListRef] = useAutoAnimate<HTMLDivElement>({
     duration: 220,
     easing: "ease-out",
   });
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const data = raw ? validateBackup(JSON.parse(raw)) : initialCollection();
-      if (!raw) localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      setCollection(data);
       if (localStorage.getItem("multiapp.layout") === "list") setLayout("list");
       const savedSort = localStorage.getItem("multiapp.sort");
       if (savedSort === "name" || savedSort === "forgotten") setSort(savedSort);
     } catch {
-      setStorageError(
-        "Não foi possível ler ou salvar a coleção. Libere o armazenamento do navegador e recarregue. Os dados existentes não foram alterados.",
-      );
+      // Preferences are a bonus; the account holds the collection itself.
     }
-    setReady(true);
-    const sync = (event: StorageEvent) => {
-      if (event.key !== STORAGE_KEY) return;
+    let cancelled = false;
+    void (async () => {
       try {
-        setCollection(
-          event.newValue ? validateBackup(JSON.parse(event.newValue)) : EMPTY,
-        );
-        setStorageError("");
+        const { user } = await fetchSession();
+        if (cancelled) return;
+        setAuthChecked(true);
+        if (user) await startSession(user);
       } catch {
-        setStorageError(
-          "A coleção mudou em outra aba, mas não pôde ser lida. Recarregue para tentar novamente.",
+        if (cancelled) return;
+        setAuthChecked(true);
+        setAuthNotice(
+          "Não foi possível falar com o servidor agora. Confira a conexão e entre de novo.",
         );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      const user = sessionRef.current;
+      if (!user || event.key !== cacheKey(user.id)) return;
+      try {
+        const next = event.newValue
+          ? validateBackup(JSON.parse(event.newValue))
+          : EMPTY;
+        collectionRef.current = next;
+        setCollection(next);
+      } catch {
+        notify("A coleção mudou em outra aba, mas não pôde ser lida aqui.");
       }
     };
     const shortcut = (event: KeyboardEvent) => {
@@ -211,36 +237,272 @@ export default function Home() {
         searchRef.current?.focus();
       }
     };
+    // Coming back to the tab is when another device's edits matter.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshFromServer();
+    };
+    const onPageHide = () => {
+      if (pendingRef.current) void flushNow(true);
+    };
     window.addEventListener("storage", sync);
     window.addEventListener("keydown", shortcut);
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pagehide", onPageHide);
     return () => {
       window.removeEventListener("storage", sync);
       window.removeEventListener("keydown", shortcut);
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pagehide", onPageHide);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function writeCache(userId: string, next: Collection) {
+    try {
+      localStorage.setItem(cacheKey(userId), JSON.stringify(next));
+    } catch {
+      // The account copy is authoritative; a full disk only costs a slower start.
+    }
+  }
+  function readCache(userId: string): Collection | null {
+    try {
+      const raw = localStorage.getItem(cacheKey(userId));
+      return raw ? validateBackup(JSON.parse(raw)) : null;
+    } catch {
+      return null;
+    }
+  }
+  function readLegacyCollection(): Collection | null {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? validateBackup(JSON.parse(raw)) : null;
+    } catch {
+      return null;
+    }
+  }
+  function applyCollection(next: Collection) {
+    collectionRef.current = next;
+    setCollection(next);
+    if (sessionRef.current) writeCache(sessionRef.current.id, next);
+  }
+  function endSession(message: string) {
+    sessionRef.current = null;
+    setSession(null);
+    setReady(false);
+    setAuthNotice(message);
+    setSyncState("idle");
+    setSyncError("");
+    pendingRef.current = null;
+    revisionRef.current = 0;
+    savedRef.current = "";
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    collectionRef.current = EMPTY;
+    setCollection(EMPTY);
+  }
+  async function startSession(user: AccountUser) {
+    sessionRef.current = user;
+    setSession(user);
+    setReady(false);
+    setSyncState("loading");
+    setSyncError("");
+    revisionRef.current = 0;
+    savedRef.current = "";
+    pendingRef.current = null;
+    const cached = readCache(user.id);
+    if (cached) applyCollection(cached);
+    try {
+      let remote: RemoteCollection = await pullCollection();
+      let migrated = 0;
+      if (remote.revision === 0) {
+        // A brand new account starts from what this browser already had, or
+        // from the editable starter selection on a device with nothing.
+        const legacy = readLegacyCollection();
+        const seed = cached?.links.length
+          ? cached
+          : legacy?.links.length
+            ? legacy
+            : initialCollection();
+        if (seed === legacy && seed.links.length > 0) migrated = seed.links.length;
+        const saved = await pushCollection(seed, 0);
+        if (saved.ok) {
+          remote = {
+            collection: saved.collection,
+            revision: saved.revision,
+            updatedAt: saved.updatedAt,
+          };
+          if (migrated > 0) {
+            try {
+              localStorage.removeItem(STORAGE_KEY);
+            } catch {
+              // The legacy key staying behind is harmless.
+            }
+          }
+        }
+      }
+      revisionRef.current = remote.revision;
+      savedRef.current = JSON.stringify(remote.collection);
+      applyCollection(remote.collection);
+      setReady(true);
+      setSyncState("synced");
+      if (migrated > 0)
+        setNotice({
+          message: `${migrated} ${migrated === 1 ? "app deste navegador foi enviado" : "apps deste navegador foram enviados"} para a sua conta.`,
+        });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        endSession("Sua sessão expirou. Entre de novo para continuar.");
+        return;
+      }
+      setSyncState("offline");
+      setSyncError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível carregar sua coleção agora.",
+      );
+      if (cached) setReady(true);
+    }
+  }
+
+  async function refreshFromServer() {
+    const user = sessionRef.current;
+    if (!user || savingRef.current) return;
+    if (pendingRef.current) {
+      void flushNow();
+      return;
+    }
+    try {
+      const remote = await pullCollection();
+      if (remote.revision > revisionRef.current) {
+        revisionRef.current = remote.revision;
+        savedRef.current = JSON.stringify(remote.collection);
+        applyCollection(remote.collection);
+        setSyncState("synced");
+        setSyncError("");
+        notify("Coleção atualizada a partir de outro aparelho.");
+      }
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401)
+        endSession("Sua sessão expirou. Entre de novo para continuar.");
+    }
+  }
+
+  async function leaveAccount() {
+    if (pendingRef.current) await flushNow();
+    try {
+      await signOut();
+    } catch {
+      // The cookie may already be gone; leaving locally is still correct.
+    }
+    endSession("Você saiu da conta. Entre de novo para ver seus apps.");
+  }
+
+  function queueSave(next: Collection) {
+    pendingRef.current = next;
+    if (saveTimerRef.current !== null) return;
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null;
+      void flushNow();
+    }, 400);
+  }
+
+  async function flushNow(keepalive = false) {
+    if (savingRef.current) return;
+    const snapshot = pendingRef.current;
+    const user = sessionRef.current;
+    if (!snapshot || !user) return;
+    const serialized = JSON.stringify(snapshot);
+    if (serialized === savedRef.current) {
+      pendingRef.current = null;
+      return;
+    }
+    savingRef.current = true;
+    setSyncState("saving");
+    try {
+      const result = await pushCollection(snapshot, revisionRef.current, keepalive);
+      if (result.ok) {
+        revisionRef.current = result.revision;
+        savedRef.current = JSON.stringify(result.collection ?? snapshot);
+        pendingRef.current = null;
+        if (result.collection && JSON.stringify(result.collection) !== serialized)
+          applyCollection(result.collection);
+        setSyncState("synced");
+        setSyncError("");
+      } else {
+        // Another device wrote first: merge both copies and try once more.
+        revisionRef.current = result.revision;
+        savedRef.current = JSON.stringify(result.collection);
+        const merged = mergeBackup(snapshot, result.collection);
+        applyCollection(merged);
+        const retry = await pushCollection(merged, result.revision, keepalive);
+        if (retry.ok) {
+          revisionRef.current = retry.revision;
+          savedRef.current = JSON.stringify(retry.collection ?? merged);
+          pendingRef.current = null;
+          setSyncState("synced");
+          setSyncError("");
+          notify("Sincronizamos sua coleção com a versão de outro aparelho.");
+        } else {
+          revisionRef.current = retry.revision;
+          savedRef.current = JSON.stringify(retry.collection);
+          pendingRef.current = null;
+          applyCollection(retry.collection);
+          setSyncState("conflict");
+          setSyncError(
+            "Outro aparelho salvou primeiro. Mostramos a versão mais recente — confira se falta algum app.",
+          );
+        }
+      }
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        endSession("Sua sessão expirou. Entre de novo para continuar.");
+      } else {
+        setSyncState("offline");
+        setSyncError(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível sincronizar agora.",
+        );
+      }
+    } finally {
+      savingRef.current = false;
+      if (pendingRef.current && pendingRef.current !== snapshot)
+        queueSave(pendingRef.current);
+    }
+  }
 
   function commit(
     transform: (current: Collection) => Collection,
   ): Collection | null {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const current = raw ? validateBackup(JSON.parse(raw)) : EMPTY;
-      const next = transform(current);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      setCollection(next);
-      setStorageError("");
+      const next = transform(collectionRef.current);
+      applyCollection(next);
+      queueSave(next);
       return next;
     } catch (error) {
       setNotice({
-        message:
-          error instanceof DOMException
-            ? "Armazenamento indisponível ou cheio. Exporte um backup e libere espaço."
-            : `Não foi possível salvar. ${(error as Error).message}`,
+        message: `Não foi possível salvar. ${(error as Error).message}`,
         error: true,
       });
       return null;
     }
   }
+
+  function retrySync() {
+    const user = sessionRef.current;
+    if (!user) return;
+    if (!ready) {
+      void startSession(user);
+      return;
+    }
+    if (pendingRef.current) void flushNow();
+    else void refreshFromServer();
+  }
+
   function notify(message: string) {
     setNotice({ message });
   }
@@ -755,15 +1017,14 @@ export default function Home() {
           Nova categoria
         </button>
         <div className="sidebar-bottom">
-          <div className="local-note">
+          <div className="local-note account-note">
             <span className="local-note-icon">
               <ShieldCheck size={19} />
             </span>
-            <strong>Seu espaço pessoal</strong>
+            <strong>{session?.username}</strong>
             <p>
-              Seus links ficam salvos
-              <br />
-              neste navegador.
+              Seus apps ficam na sua conta
+              <br />e abrem em qualquer aparelho.
             </p>
           </div>
           <button
@@ -777,6 +1038,17 @@ export default function Home() {
             Importar e exportar
             <ChevronRight size={15} />
           </button>
+          <button
+            className="backup-nav"
+            onClick={() => {
+              setMobileOpen(false);
+              void leaveAccount();
+            }}
+          >
+            <LogOut size={17} />
+            Sair da conta
+            <ChevronRight size={15} />
+          </button>
           <div className="sidebar-foot">
             <span className="tiny-mark">m.</span>
             <span>Menos abas. Mais foco.</span>
@@ -785,6 +1057,17 @@ export default function Home() {
       </>
     );
   }
+  if (!authChecked) return <AuthBoot />;
+  if (!session)
+    return (
+      <AuthScreen
+        notice={authNotice}
+        onAuthenticated={(user) => {
+          setAuthNotice("");
+          void startSession(user);
+        }}
+      />
+    );
   return (
     <MotionConfig reducedMotion="user" transition={{ duration: 0.24, ease: "easeOut" }}>
     <div className={`app-shell ${focusMode && section === "library" ? "focus-mode" : ""}`}>
@@ -815,22 +1098,53 @@ export default function Home() {
               <AnimatedText text={sectionTitle} />
             </strong>
           </div>
-          <span className="save-status">
+          <span className={`save-status sync-${syncState}`}>
             <span />
-            {storageError
-              ? "Armazenamento indisponível"
-              : ready
-                ? "Salvo neste navegador"
-                : "Carregando coleção…"}
+            {!ready
+              ? "Carregando coleção…"
+              : syncState === "saving"
+                ? "Salvando…"
+                : syncState === "offline"
+                  ? "Sem conexão — salvo neste aparelho"
+                  : syncState === "conflict"
+                    ? "Atualizado em outro aparelho"
+                    : "Sincronizado"}
           </span>
-          <button
-            className="profile-avatar"
-            onClick={() => setBackupOpen(true)}
-            aria-label="Armazenamento e backup"
-            title="Armazenamento e backup"
-          >
-            M
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="profile-avatar"
+                aria-label={`Conta de ${session.username}`}
+                title={`Conta de ${session.username}`}
+              >
+                {session.username.slice(0, 1).toUpperCase()}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="account-menu">
+              <div className="account-menu-head">
+                <span>CONTA</span>
+                <strong>{session.username}</strong>
+                <small>
+                  {syncState === "offline"
+                    ? "Sem conexão agora"
+                    : "Mesma coleção em todos os aparelhos"}
+                </small>
+              </div>
+              <DropdownMenuItem onSelect={() => setBackupOpen(true)}>
+                <ArrowDownToLine size={15} />
+                Importar e exportar
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void refreshFromServer()}>
+                <RefreshCw size={15} />
+                Buscar mudanças de outro aparelho
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => void leaveAccount()}>
+                <LogOut size={15} />
+                Sair da conta
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </header>
         <main>
           {section === "library" ? (
@@ -845,20 +1159,17 @@ export default function Home() {
               </div>
               <button
                 className="button primary add-top"
-                disabled={!ready || !!storageError}
+                disabled={!ready}
                 onClick={() => (editor ? setEditorOpen(true) : openEditor())}
               >
                 <Plus size={18} />
                 Adicionar app
               </button>
             </motion.div>
-            {storageError && (
+            {syncError && (
               <div className="error-banner" role="alert">
-                {storageError}
-                <button
-                  className="button secondary"
-                  onClick={() => window.location.reload()}
-                >
+                {syncError}
+                <button className="button secondary" onClick={retrySync}>
                   Tentar novamente
                 </button>
               </div>
@@ -954,7 +1265,7 @@ export default function Home() {
                 </div>
                 <button
                   className="button primary"
-                  disabled={!ready || !!storageError}
+                  disabled={!ready}
                   type="submit"
                 >
                   <Plus size={17} />
@@ -1508,20 +1819,20 @@ export default function Home() {
           if (!importing) setBackupOpen(open);
         }}
         title="Sua coleção vai com você"
-        description="Exporte um backup para guardar ou levar seus apps para outro navegador."
+        description="Sua conta já sincroniza os apps. O backup é uma cópia extra."
       >
         <div className="backup-info">
           <ShieldCheck size={22} />
           <p>
-            Os links ficam <strong>somente neste navegador</strong>. Não há
-            sincronização entre aparelhos. Limpar os dados do navegador também
-            apaga a coleção.
+            Seus apps ficam na sua conta e abrem em{" "}
+            <strong>qualquer aparelho</strong> onde você entrar. Este arquivo é
+            uma cópia extra, útil antes de mudanças grandes.
           </p>
         </div>
         <button
           className="backup-option"
           onClick={exportBackup}
-          disabled={!ready || !!storageError}
+          disabled={!ready}
         >
           <span>
             <ArrowDownToLine size={22} />
@@ -1536,7 +1847,7 @@ export default function Home() {
         </button>
         <button
           className="backup-option"
-          disabled={importing || !!storageError}
+          disabled={importing}
           aria-busy={importing}
           onClick={() => importRef.current?.click()}
         >
