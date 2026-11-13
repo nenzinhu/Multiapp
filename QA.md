@@ -576,3 +576,28 @@ console; `tsc`, `lint`, 58 testes e `build` ok.
 Limites: o código identifica o cofre, não a pessoa; sem a senha mestra correta
 não há como abrir um envelope (por design). Se o aparelho tinha um cofre próprio
 e ele foi descartado antes desta versão, não há como recuperá-lo.
+
+## 2026 refresh: abrir o site já com a senha copiada
+
+Pedido: apertar no cartão da senha e entrar no site com usuário e senha. Um site
+não pode preencher o formulário de outro domínio (o navegador bloqueia acesso
+cross-origin); o que dá para fazer sem extensão é abrir o site e deixar a senha
+pronta no clipboard. Foi o que passou a acontecer:
+
+- O botão de chave do tile **abre o app em nova aba** e copia a senha no mesmo
+  gesto (a abertura acontece antes do `await` para não ser bloqueada como popup).
+- Menu do tile: **Abrir e copiar login**, **Copiar só a senha** e **Copiar
+  usuário**; o cartão de clipboard continua com contagem de 30s e limpeza.
+- Nada de URL com `usuario:senha@host` (rejeitada pela validação) nem tentativa de
+  preencher formulário alheio.
+
+Verificação (Chromium 1280x900, permissões de clipboard): com credencial do
+GitHub e a chave no tile, o clique abriu **1 nova aba** e o clipboard ficou com
+`senha-local-login-1`; o menu mostrou os sete itens, incluindo as três ações de
+login; sem erros de console.
+
+Testes: 58 passando; `tsc`, `lint` e `build` ok.
+
+Limites: preenchimento automático real exige extensão de navegador (ou o gerenciador
+do próprio navegador). O app não guarda a senha em campos de terceiros e continua
+sem acesso a outras origens.

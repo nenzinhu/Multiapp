@@ -37,6 +37,7 @@ import {
   Sparkles,
   Star,
   Trash2,
+  UserRound,
   X,
 } from "lucide-react";
 import {
@@ -357,12 +358,31 @@ export default function Home() {
     if (announce) notify("Área de transferência limpa.");
   }
 
-  async function copyVaultLogin(link: AppLink, record?: VaultRecord) {
+  function openSite(link: AppLink): void {
+    try {
+      window.open(link.url, "_blank", "noopener,noreferrer");
+    } catch {
+      notify("Senha copiada. Abra o app pelo cartão — o navegador bloqueou a aba.");
+    }
+  }
+
+  /**
+   * Copies the password and, when asked, opens the app in a new tab. Filling the
+   * form of another site is not something a website may do; the open + copy
+   * flow is the closest the browser allows without an extension.
+   */
+  async function copyVaultLogin(
+    link: AppLink,
+    record?: VaultRecord,
+    openAfter = false,
+  ) {
     const match = record ?? loginFor(link);
     if (!match) {
       requestVaultUnlock(link);
       return;
     }
+    // Open first, still inside the click gesture, so the tab is not blocked.
+    if (openAfter) openSite(link);
     try {
       await copyText(match.secret);
       setClipboard({ record: match, seconds: 30 });
@@ -1633,9 +1653,9 @@ export default function Home() {
                         {loginFor(link) && (
                           <button
                             className="icon-button card-key"
-                            aria-label={`Copiar senha de ${link.name} do cofre`}
-                            title="Copiar login do cofre"
-                            onClick={() => void copyVaultLogin(link)}
+                            aria-label={`Abrir ${link.name} e copiar a senha do cofre`}
+                            title="Abrir o site e copiar a senha"
+                            onClick={() => void copyVaultLogin(link, undefined, true)}
                           >
                             <KeyRound size={13} />
                           </button>
@@ -1656,14 +1676,40 @@ export default function Home() {
                                 : "Favoritar"}
                             </DropdownMenuItem>
                             {(loginFor(link) || vaultStored) && (
-                              <DropdownMenuItem
-                                onSelect={() => void copyVaultLogin(link)}
-                              >
-                                <KeyRound size={15} />
-                                {loginFor(link)
-                                  ? "Copiar login do cofre"
-                                  : "Desbloquear e copiar login"}
-                              </DropdownMenuItem>
+                              <>
+                                <DropdownMenuItem
+                                  onSelect={() =>
+                                    void copyVaultLogin(link, undefined, true)
+                                  }
+                                >
+                                  <KeyRound size={15} />
+                                  Abrir e copiar login
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() => void copyVaultLogin(link)}
+                                >
+                                  <Copy size={15} />
+                                  Copiar só a senha
+                                </DropdownMenuItem>
+                                {loginFor(link)?.username && (
+                                  <DropdownMenuItem
+                                    onSelect={() => {
+                                      void copyText(loginFor(link)!.username).then(
+                                        () => notify("Usuário copiado."),
+                                        () =>
+                                          setNotice({
+                                            message:
+                                              "Não foi possível copiar o usuário.",
+                                            error: true,
+                                          }),
+                                      );
+                                    }}
+                                  >
+                                    <UserRound size={15} />
+                                    Copiar usuário
+                                  </DropdownMenuItem>
+                                )}
+                              </>
                             )}
                             <DropdownMenuItem onSelect={() => openEditor(link)}>
                               <Pencil size={15} />

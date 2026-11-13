@@ -201,10 +201,14 @@ an actionable message instead of pretending to save.
 - Secrets are masked by default (`••••••1234`), can be revealed one at a time
   and can be copied to the clipboard.
 - **Login em um clique:** while the vault is unlocked, the library marks every
-  app whose host has a site credential with a key button. One click copies the
-  password and shows a card with a 30-second countdown, a "Copiar usuário"
-  action and "Limpar agora"; the clipboard is wiped when the timer ends, when
-  the tab is closed or when the vault is locked. With the vault locked, the tile
+  app whose host has a site credential with a key button. One click **opens the
+  app in a new tab** and copies the password, then shows a card with a 30-second
+  countdown, a "Copiar usuário" action and "Limpar agora"; the clipboard is
+  wiped when the timer ends, when the tab is closed or when the vault is locked.
+  The tile menu keeps "Abrir e copiar login", "Copiar só a senha" and "Copiar
+  usuário". A website cannot type into another site's login form (cross-origin
+  DOM access is blocked by the browser): true autofill needs a browser extension
+  or the browser's own password manager. With the vault locked, the tile
   menu offers "Desbloquear e copiar login", asking for the master passphrase
   without leaving the library. Vault entries never request favicons, so
   no hostname leaves the browser.
