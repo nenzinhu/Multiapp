@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Star,
   Trash2,
+  Upload,
 } from "lucide-react";
 
 import {
@@ -31,8 +32,10 @@ import {
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 
 import { Counter } from "@/components/counter";
+import { ImportPasswordsDialog } from "@/components/vault/import-dialog";
 import { RecordDialog, type RecordDraft } from "@/components/vault/record-dialog";
 import { AI_PROVIDERS, type AiProvider } from "@/lib/ai-providers";
+import { mergeImportedRecords } from "@/lib/password-import";
 import { entrance, pop, shake } from "@/lib/animations";
 import {
   changePassphrase,
@@ -177,6 +180,7 @@ export function VaultView({ section }: { section: VaultSection }) {
   const [revealed, setRevealed] = React.useState<string[]>([]);
   const [busy, setBusy] = React.useState(false);
   const [unlockValue, setUnlockValue] = React.useState("");
+  const [importOpen, setImportOpen] = React.useState(false);
   const [vaultListRef] = useAutoAnimate<HTMLUListElement>({
     duration: 240,
     easing: "ease-out",
@@ -231,6 +235,26 @@ export function VaultView({ section }: { section: VaultSection }) {
     writeStoredVault(sealed);
     setRecords(next);
     rememberVaultRecords(next);
+  }
+
+  async function handleImport(imported: VaultRecord[]) {
+    try {
+      const merged = mergeImportedRecords(records, imported);
+      await persist(merged.records);
+      setImportOpen(false);
+      notify(
+        `${merged.added} ${
+          merged.added === 1 ? "credencial importada" : "credenciais importadas"
+        }${merged.duplicates ? `, ${merged.duplicates} já existiam` : ""}.`,
+      );
+    } catch (caught) {
+      notify(
+        (caught as Error).message ||
+          "Não foi possível salvar as credenciais importadas.",
+        undefined,
+        true,
+      );
+    }
   }
 
   async function handleCreate(passphrase: string, confirmation: string) {
@@ -712,9 +736,22 @@ export function VaultView({ section }: { section: VaultSection }) {
                 <ArrowDownToLine size={16} />
                 Exportar
               </button>
-              <label className="button secondary vault-import">
+              {!isProviders && (
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => setImportOpen(true)}
+                >
+                  <Upload size={16} />
+                  Importar senhas
+                </button>
+              )}
+              <label
+                className="button secondary vault-import"
+                title="Importar um backup criptografado do cofre (.json)"
+              >
                 <ArrowUpFromLine size={16} />
-                Importar
+                Backup
                 <input
                   type="file"
                   accept="application/json,.json"
@@ -818,6 +855,13 @@ export function VaultView({ section }: { section: VaultSection }) {
           </section>
         </>
       )}
+
+      <ImportPasswordsDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        existing={records}
+        onSubmit={(imported) => void handleImport(imported)}
+      />
 
       <RecordDialog
         open={dialog.open}

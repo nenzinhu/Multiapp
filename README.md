@@ -192,7 +192,7 @@ an actionable message instead of pretending to save.
   no hostname leaves the browser.
 - "Exportar" writes the encrypted envelope to a JSON file; "Importar" asks for
   the passphrase of the imported file and merges the records, keeping the ones
-  already stored. Limits: 500 records per vault.
+  already stored. Limits: 5.000 records per vault.
 
 ## Motion
 
@@ -271,6 +271,29 @@ If "Criar conta" answers with an error, open `/api/health` first:
 deployment (or a restart, on a long-running server) picks it up. The SQLite
 driver is imported lazily, so a Postgres-only deployment also runs on Node 18/20
 where `node:sqlite` does not exist.
+
+## Importar senhas de outros gerenciadores
+
+Em **Senhas de sites → Importar senhas** (cofre aberto) você traz as senhas que
+já existem no navegador ou em outro gerenciador. Tudo é lido **neste navegador**,
+mostra uma prévia com o que entra, o que já existia e o que foi ignorado, e é
+salvo **criptografado** no cofre — nada vai para o servidor.
+
+| Origem | Como exportar | Formato |
+| --- | --- | --- |
+| Chrome / Edge / Google | `chrome://password-manager/settings` → Exportar senhas | `Chrome Passwords.csv` |
+| LastPass | Vault → Advanced Options → Export | `.csv` |
+| Bitwarden | Tools → Export vault → `.csv` ou `.json` (sem senha) | `.csv` / `.json` |
+| 1Password | File → Export → CSV | `.csv` |
+| Multiapp | Cofre → Exportar | `.json` (backup do cofre) |
+| Outro | qualquer tabela com colunas de site/usuário/senha | `.csv` |
+
+O leitor aceita `,`, `;` ou tabulação; cabeçalhos em português ou inglês; aspas e
+quebras de linha dentro de campos; BOM do Excel; e URLs sem `https://`. Linhas
+com `android://`/`chrome://` (apps do celular e páginas internas) são ignoradas.
+Duplicatas são detectadas por **host + usuário** — o que já está no cofre não é
+sobrescrito. Limites: 5 MB por arquivo e 5.000 registros no cofre. O botão
+**Backup** continua sendo o backup criptografado do próprio cofre.
 
 ## Brand and icons
 
