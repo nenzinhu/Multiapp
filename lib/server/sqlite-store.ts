@@ -12,6 +12,7 @@ import {
   toUser,
   usernameKey,
   validatePassword,
+  validateVaultEnvelope,
   type Storage,
   type StoreUser,
   type StoredCollection,
@@ -187,6 +188,89 @@ export function createSqliteStorage(db: AppDatabase): Storage {
 
     async ping() {
       db.prepare("SELECT 1").get();
+    },
+
+    async readVault(userId) {
+      const row = db
+        .prepare(
+          "SELECT revision, salt, iv, data, updated_at FROM vaults WHERE user_id = ?",
+        )
+        .get(userId) as
+        | { revision: number; salt: string; iv: string; data: string; updated_at: number }
+        | undefined;
+      if (!row) return null;
+      return {
+        envelope: {
+          version: 1 as const,
+          salt: row.salt,
+          iv: row.iv,
+          data: row.data,
+          updatedAt: Number(row.updated_at),
+        },
+        revision: Number(row.revision),
+      };
+    },
+
+    async writeVault(userId, payload, expectedRevision) {
+      const envelope = validateVaultEnvelope(payload);
+      const current = db
+        .prepare("SELECT revision FROM vaults WHERE user_id = ?")
+        .get(userId) as { revision: number } | undefined;
+      const revision = current ? Number(current.revision) : 0;
+      if (expectedRevision !== undefined && expectedRevision !== revision)
+        throw new StoreError(
+          "revision-conflict",
+          409,
+          "O cofre mudou em outro aparelho. Recarregue para ver a versão mais recente.",
+        );
+      const next = revision + 1;
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const result = db
+          .prepare(
+            `INSERT INTO vaults (user_id, revision, salt, iv, data, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT (user_id) DO UPDATE
+               SET revision = excluded.revision,
+                   salt = excluded.salt,
+                   iv = excluded.iv,
+                   data = excluded.data,
+                   updated_at = excluded.updated_at
+             WHERE vaults.revision = ?`,
+          )
+          .run(
+            userId,
+            next,
+            envelope.salt,
+            envelope.iv,
+            envelope.data,
+            envelope.updatedAt,
+            revision,
+          );
+        if (Number(result.changes) === 0) {
+          db.exec("ROLLBACK");
+          throw new StoreError(
+            "revision-conflict",
+            409,
+            "O cofre mudou em outro aparelho. Recarregue para ver a versão mais recente.",
+          );
+        }
+        db.exec("COMMIT");
+      } catch (error) {
+        if (!(error instanceof StoreError)) {
+          try {
+            db.exec("ROLLBACK");
+          } catch {
+            // Transaction already gone.
+          }
+        }
+        throw error;
+      }
+      return { envelope, revision: next };
+    },
+
+    async deleteVault(userId) {
+      db.prepare("DELETE FROM vaults WHERE user_id = ?").run(userId);
     },
 
     async close() {

@@ -34,6 +34,7 @@ import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { Counter } from "@/components/counter";
 import { ImportPasswordsDialog } from "@/components/vault/import-dialog";
 import { RecordDialog, type RecordDraft } from "@/components/vault/record-dialog";
+import { pullVault, pushVault } from "@/lib/account";
 import { AI_PROVIDERS, type AiProvider } from "@/lib/ai-providers";
 import { mergeImportedRecords } from "@/lib/password-import";
 import { entrance, pop, shake } from "@/lib/animations";
@@ -181,6 +182,10 @@ export function VaultView({ section }: { section: VaultSection }) {
   const [busy, setBusy] = React.useState(false);
   const [unlockValue, setUnlockValue] = React.useState("");
   const [importOpen, setImportOpen] = React.useState(false);
+  const [syncState, setSyncState] = React.useState<
+    "loading" | "synced" | "saving" | "offline"
+  >("loading");
+  const revisionRef = React.useRef(0);
   const [vaultListRef] = useAutoAnimate<HTMLUListElement>({
     duration: 240,
     easing: "ease-out",
@@ -202,6 +207,45 @@ export function VaultView({ section }: { section: VaultSection }) {
 
   React.useEffect(() => {
     setStatus(readStoredVault() ? "locked" : "setup");
+  }, []);
+
+  // Reconcile the local envelope with the account copy. Only sealed data
+  // travels; adopting a newer remote copy is what makes a new device work.
+  React.useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const remote = await pullVault();
+        if (cancelled) return;
+        revisionRef.current = remote.revision;
+        const local = readStoredVault();
+        if (!remote.vault) {
+          if (local) await pushSealed(local);
+          else setSyncState("synced");
+          return;
+        }
+        if (!local || remote.vault.updatedAt > local.updatedAt) {
+          writeStoredVault(remote.vault);
+          setStatus("locked");
+          setRecords([]);
+          if (local)
+            notify("O cofre da sua conta é mais recente e foi atualizado aqui.");
+          setSyncState("synced");
+          return;
+        }
+        if (local.updatedAt > remote.vault.updatedAt) {
+          await pushSealed(local);
+          return;
+        }
+        setSyncState("synced");
+      } catch {
+        if (!cancelled) setSyncState("offline");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   React.useEffect(() => {
@@ -230,11 +274,44 @@ export function VaultView({ section }: { section: VaultSection }) {
     setNotice({ message, undo, error: isError });
   }
 
+  async function pushSealed(sealed: StoredVault): Promise<void> {
+    setSyncState("saving");
+    try {
+      const result = await pushVault(sealed, revisionRef.current);
+      if (result.ok) {
+        revisionRef.current = result.revision;
+        setSyncState("synced");
+        return;
+      }
+      revisionRef.current = result.revision;
+      if (result.vault && result.vault.updatedAt > sealed.updatedAt) {
+        // Another device wrote a newer copy: adopt it instead of overwriting.
+        writeStoredVault(result.vault);
+        setStatus("locked");
+        setRecords([]);
+        lockVault();
+        notify(
+          "O cofre de outro aparelho é mais recente. Desbloqueie com a senha mestra para vê-lo.",
+          undefined,
+          true,
+        );
+        setSyncState("synced");
+        return;
+      }
+      const retry = await pushVault(sealed, result.revision);
+      if (retry.ok) revisionRef.current = retry.revision;
+      setSyncState("synced");
+    } catch {
+      setSyncState("offline");
+    }
+  }
+
   async function persist(next: VaultRecord[]) {
     const sealed = await sealRecords(next);
     writeStoredVault(sealed);
     setRecords(next);
     rememberVaultRecords(next);
+    await pushSealed(sealed);
   }
 
   async function handleImport(imported: VaultRecord[]) {
@@ -272,6 +349,7 @@ export function VaultView({ section }: { section: VaultSection }) {
       writeStoredVault(stored);
       setRecords([]);
       rememberVaultRecords([]);
+      await pushSealed(stored);
       setPassphraseMode(null);
       setStatus("unlocked");
       setError("");
@@ -475,6 +553,7 @@ export function VaultView({ section }: { section: VaultSection }) {
     try {
       const sealed = await changePassphrase(records, passphrase);
       writeStoredVault(sealed);
+      await pushSealed(sealed);
       setPassphraseMode(null);
       notify("Senha mestra trocada.");
     } catch (caught) {
@@ -502,7 +581,8 @@ export function VaultView({ section }: { section: VaultSection }) {
           <h3>Crie seu cofre</h3>
           <p>
             O cofre guarda senhas de sites e chaves de API criptografadas
-            (AES-GCM) neste navegador. A senha mestra nunca é guardada: se você
+            (AES-GCM) e sincronizado como ciphertext na sua conta. A senha mestra
+            nunca é guardada: se você
             esquecer, não existe como recuperar.
           </p>
           <button
@@ -675,7 +755,7 @@ export function VaultView({ section }: { section: VaultSection }) {
           <p>
             {isProviders
               ? "Um catálogo de provedores gratuitos e as chaves que você já guardou."
-              : "Credenciais de sites guardadas criptografadas neste navegador."}
+              : "Credenciais de sites criptografadas neste navegador e na sua conta."}
           </p>
         </div>
         {status === "unlocked" && (
@@ -703,10 +783,17 @@ export function VaultView({ section }: { section: VaultSection }) {
             </span>
             <span>
               <Lock size={15} />
-              <strong>criptografado</strong> neste navegador
+              <strong>criptografado</strong> de ponta a ponta
             </span>
             <span className="overview-note">
-              <span /> A senha mestra não sai daqui
+              <span />
+              {syncState === "loading"
+                ? "Verificando a sua conta…"
+                : syncState === "saving"
+                  ? "Salvando na sua conta…"
+                  : syncState === "offline"
+                    ? "Só neste aparelho — sem conexão"
+                    : "Criptografado e sincronizado"}
             </span>
           </div>
 

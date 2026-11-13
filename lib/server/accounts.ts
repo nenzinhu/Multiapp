@@ -24,6 +24,42 @@ export type StoredCollection = {
   updatedAt: number;
 };
 
+/** Opaque encrypted vault envelope: the server never sees the passphrase. */
+export type VaultEnvelope = {
+  version: 1;
+  salt: string;
+  iv: string;
+  data: string;
+  updatedAt: number;
+};
+
+export type StoredVaultSync = {
+  envelope: VaultEnvelope;
+  revision: number;
+};
+
+const MAX_VAULT_BYTES = 4 * 1024 * 1024;
+
+/** Shape and size checks only; the content is ciphertext. */
+export function validateVaultEnvelope(raw: unknown): VaultEnvelope {
+  const value = raw as Partial<VaultEnvelope>;
+  const invalid = new StoreError(
+    "vault-invalid",
+    400,
+    "Cofre inválido: envie o envelope criptografado completo.",
+  );
+  if (!value || typeof value !== "object") throw invalid;
+  if (value.version !== 1) throw invalid;
+  const salt = typeof value.salt === "string" ? value.salt : "";
+  const iv = typeof value.iv === "string" ? value.iv : "";
+  const data = typeof value.data === "string" ? value.data : "";
+  if (!salt || !iv || !data) throw invalid;
+  if (salt.length > 256 || iv.length > 256 || data.length > MAX_VAULT_BYTES)
+    throw new StoreError("vault-too-large", 413, "O cofre passa do limite de 4 MB.");
+  if (!Number.isFinite(value.updatedAt)) throw invalid;
+  return { version: 1, salt, iv, data, updatedAt: value.updatedAt! };
+}
+
 /**
  * Everything the API needs from a database. Implemented twice: SQLite for
  * local runs and Postgres (Supabase) for deployments.
@@ -38,6 +74,13 @@ export type Storage = {
   findSessionUser(token: string): Promise<StoreUser | null>;
   deleteSession(token: string): Promise<void>;
   readCollection(userId: string): Promise<StoredCollection>;
+  readVault(userId: string): Promise<StoredVaultSync | null>;
+  writeVault(
+    userId: string,
+    envelope: unknown,
+    expectedRevision?: number,
+  ): Promise<StoredVaultSync>;
+  deleteVault(userId: string): Promise<void>;
   writeCollection(
     userId: string,
     payload: unknown,
