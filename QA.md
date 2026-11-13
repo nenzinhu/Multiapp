@@ -146,3 +146,39 @@ Limites: a URL direta (IPv6) não foi testada; o pooler de transação foi o ún
 caminho validado. Sem `DATABASE_URL` o app continua usando SQLite. O pool tem no
 máximo 4 conexões por processo e o limite de tentativas de login segue em
 memória, por instância.
+
+## 2026 refresh: novo logo, ícone e paleta
+
+Pedido: criar um logo novo e um favicon para usar como ícone, e aplicar essas
+cores ao design. O mark é um tile lime (#d9f26b) de cantos 22% com um "m"
+floresta (#123b31), desenhado em SVG (traço 46/512, pontas arredondadas) e
+reutilizado no lockup, no favicon, no ícone instalável e no iPhone.
+
+Arquivos: `public/multiapp.svg`, `public/favicon.svg`, `app/icon.svg`,
+`public/icon-192.png`, `public/icon-512.png`, `public/icon-maskable-512.png`,
+`app/apple-icon.png`, `app/manifest.ts`, `components/logo.tsx` (SVG inline) e
+`app/layout.tsx` (theme-color, manifest, Apple web app).
+
+Paleta aplicada aos tokens de `app/globals.css`: fundo `#f2f6f2`, texto
+`#14251f`, primária `#16735f`, primária suave `#e6f0e8`, borda `#dde7df`,
+muted `#5b6f65`, shelf `#123b31`, highlight `#d9f26b`. Contrastes medidos: texto
+14.64:1 no fundo, muted 5.38:1 no branco, primária 5.75:1 no branco, anel de
+foco 4.27:1 no fundo e 4.66:1 no branco, lime 9.95:1 no shelf e texto do shelf
+11.21:1.
+
+Build: `npx tsc --noEmit`, `npm run lint` (só o aviso conhecido do favicon
+remoto), `npm run build` e `npm test` (41 casos) sem erros. `/icon.svg`,
+`/icon-192.png`, `/apple-icon.png` e `/manifest.webmanifest` respondem 200 com o
+content-type certo; o manifest traz `standalone`, `pt-BR`, `theme_color
+#123b31` e os três ícones.
+
+Navegador (Chromium, 1280x900 e 390x844): o lockup aparece na entrada e na
+sidebar com o novo mark em 30px, o mark não distorce (`width`/`height` 30), o
+`theme-color` é `#123b31`, e o favicon foi conferido em 16, 32 e 64 px — o "m"
+continua legível no menor tamanho. Telas de entrada e biblioteca revisadas nas
+duas larguras sem overflow e sem erros de console.
+
+Limites: o icon maskable não foi testado em um launcher Android real; a
+instalação PWA foi verificada pelo manifest servido, não pelo prompt de
+instalação. `favicon.ico` não é gerado (o `app/icon.svg` cobre navegadores
+modernos).

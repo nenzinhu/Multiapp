@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Eye,
-  EyeOff,
-  KeyRound,
-  LockKeyhole,
-  MonitorSmartphone,
-  ShieldCheck,
-  UserRound,
-} from "lucide-react";
+import { Eye, EyeOff, LockKeyhole, UserRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { Logo } from "@/components/logo";
@@ -76,51 +68,22 @@ export function AuthScreen({
   return (
     <main className="auth-shell">
       <section className="auth-story" aria-labelledby="auth-story-title">
-        <div className="auth-story-top">
-          <Logo />
-        </div>
+        <Logo />
         <div className="auth-story-body">
-          <p className="auth-eyebrow">SEU ESPAÇO EM QUALQUER APARELHO</p>
           <h1 id="auth-story-title">
             Todos os seus apps.
             <br />
             <span>Uma senha só.</span>
           </h1>
           <p className="auth-lede">
-            Entre com usuário e senha e a sua biblioteca abre inteira — no
-            computador, no tablet ou no celular.
+            Entre e a sua biblioteca abre inteira, em qualquer aparelho.
           </p>
-          <ul className="auth-points">
-            <li>
-              <MonitorSmartphone size={19} aria-hidden="true" />
-              <div>
-                <strong>Mesma coleção em todo lugar</strong>
-                <span>O que você salva aqui aparece nos outros aparelhos.</span>
-              </div>
-            </li>
-            <li>
-              <ShieldCheck size={19} aria-hidden="true" />
-              <div>
-                <strong>Sua senha protegida</strong>
-                <span>Ela é guardada embaralhada (scrypt) e nunca em texto.</span>
-              </div>
-            </li>
-            <li>
-              <KeyRound size={19} aria-hidden="true" />
-              <div>
-                <strong>Favoritos e categorias juntos</strong>
-                <span>Sua organização acompanha a sua conta.</span>
-              </div>
-            </li>
-          </ul>
         </div>
         <p className="auth-story-foot">Menos abas. Mais foco.</p>
       </section>
+
       <section className="auth-panel" aria-labelledby="auth-title">
         <div className="auth-card">
-          <div className="auth-mobile-brand">
-            <Logo />
-          </div>
           <div className="auth-tabs" role="group" aria-label="Entrar ou criar conta">
             <button
               type="button"
@@ -142,13 +105,11 @@ export function AuthScreen({
 
           <header className="auth-head">
             <h2 id="auth-title">
-              {mode === "signin" ? "Acesse sua biblioteca" : "Crie sua conta"}
+              {mode === "signin" ? "Entre para continuar" : "Crie sua conta"}
             </h2>
-            <p>
-              {mode === "signin"
-                ? "Use o usuário e a senha que você já cadastrou."
-                : "Escolha um usuário e uma senha para os seus apps."}
-            </p>
+            {mode === "signup" && (
+              <p>Usuário de 3 a 32 caracteres e senha de 8 a 200.</p>
+            )}
           </header>
 
           {notice && (
@@ -189,12 +150,10 @@ export function AuthScreen({
                 type={reveal ? "text" : "password"}
                 autoComplete={mode === "signin" ? "current-password" : "new-password"}
                 enterKeyHint="go"
-                placeholder={
-                  mode === "signin" ? "sua senha" : "mínimo de 8 caracteres"
-                }
+                placeholder={mode === "signin" ? "sua senha" : "mínimo de 8 caracteres"}
                 value={password}
                 aria-invalid={!!error}
-                aria-describedby={error ? "auth-error" : "auth-hint"}
+                aria-describedby={error ? "auth-error" : undefined}
                 onChange={(event) => {
                   setPassword(event.target.value);
                   setError("");
@@ -211,12 +170,6 @@ export function AuthScreen({
               </button>
             </div>
 
-            <p id="auth-hint" className="auth-hint">
-              {mode === "signin"
-                ? "A mesma conta abre sua coleção em qualquer aparelho."
-                : "De 8 a 200 caracteres. Evite a senha de outros sites."}
-            </p>
-
             {error && (
               <p id="auth-error" className="auth-error" role="alert">
                 {error}
@@ -228,36 +181,10 @@ export function AuthScreen({
               type="submit"
               disabled={pending}
             >
-              {pending
-                ? "Abrindo…"
-                : mode === "signin"
-                  ? "Entrar e ver meus apps"
-                  : "Criar conta e entrar"}
+              {pending ? "Abrindo…" : mode === "signin" ? "Entrar" : "Criar conta"}
             </button>
           </form>
-
-          <p className="auth-switch">
-            {mode === "signin" ? (
-              <>
-                Ainda não tem conta?{" "}
-                <button type="button" onClick={() => switchMode("signup")}>
-                  Criar agora
-                </button>
-              </>
-            ) : (
-              <>
-                Já tem conta?{" "}
-                <button type="button" onClick={() => switchMode("signin")}>
-                  Entrar
-                </button>
-              </>
-            )}
-          </p>
         </div>
-        <p className="auth-privacy">
-          Seus apps ficam na sua conta, no servidor — não neste navegador. O
-          cofre de senhas continua criptografado e local.
-        </p>
       </section>
     </main>
   );

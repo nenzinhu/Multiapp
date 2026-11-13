@@ -232,3 +232,19 @@ those reserved paths.
 - [Next.js documentation](https://nextjs.org/docs)
 - [Tailwind CSS v4](https://tailwindcss.com/docs)
 - [shadcn/ui](https://ui.shadcn.com)
+
+## Brand and icons
+
+- `components/logo.tsx` — inline SVG lockup (mark + `multiapp.`), themed by
+  `--logo-tile` and `--logo-glyph`
+- `public/multiapp.svg`, `public/favicon.svg`, `app/icon.svg` — the vector mark
+  (lime tile, forest "m")
+- `public/icon-192.png`, `public/icon-512.png`, `public/icon-maskable-512.png`,
+  `app/apple-icon.png` — raster icons for install, Android maskable and iOS
+- `app/manifest.ts` — web manifest (`standalone`, forest theme color, pt-BR)
+- `app/layout.tsx` — `theme-color`, Apple web app metadata and icon links
+
+Palette (runtime tokens in `app/globals.css`, documented in `DESIGN.md`):
+forest `#123b31`, lime `#d9f26b`, teal `#16735f`, canvas `#f2f6f2`, text
+`#14251f`. Focus ring `#2f8172` measures 4.27:1 on the canvas and 4.66:1 on
+white.
