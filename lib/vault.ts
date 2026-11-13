@@ -37,6 +37,15 @@ export type StoredVault = {
   updatedAt: number;
 };
 
+/**
+ * The same phrase typed on a phone, a desktop or a different keyboard must
+ * derive the same key: trim the accidental space mobile keyboards add and use
+ * NFKC so composed/decomposed accents match.
+ */
+export function normalizePassphrase(value: string): string {
+  return value.trim().normalize("NFKC");
+}
+
 const ITERATIONS = 210_000;
 const SALT_BYTES = 16;
 const IV_BYTES = 12;
@@ -115,6 +124,13 @@ function fromBase64(value: string): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
+/** Normalized phrase first, then the raw input (legacy vaults keep working). */
+function passphraseVariants(value: string): string[] {
+  const normalized = normalizePassphrase(value);
+  const trimmed = value.trim();
+  return [...new Set([normalized, trimmed, value].filter(Boolean))];
+}
+
 async function deriveKey(
   passphrase: string,
   salt: Uint8Array<ArrayBuffer>,
@@ -146,7 +162,7 @@ export async function createVault(
   records: VaultRecord[] = [],
 ): Promise<StoredVault> {
   const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
-  const key = await deriveKey(passphrase, salt);
+  const key = await deriveKey(normalizePassphrase(passphrase), salt);
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const plaintext = new TextEncoder().encode(
     JSON.stringify({ version: VAULT_VERSION, records } satisfies VaultData),
@@ -173,22 +189,26 @@ export async function unlockVault(
   passphrase: string,
 ): Promise<VaultData> {
   const salt = fromBase64(stored.salt);
-  const key = await deriveKey(passphrase, salt);
-  let plaintext: ArrayBuffer;
-  try {
-    plaintext = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: fromBase64(stored.iv) },
-      key,
-      fromBase64(stored.data),
-    );
-  } catch {
-    throw new Error(
-      "Senha mestra incorreta ou cofre corrompido. Nada foi alterado.",
-    );
+  const iv = fromBase64(stored.iv);
+  const data = fromBase64(stored.data);
+  for (const variant of passphraseVariants(passphrase)) {
+    const key = await deriveKey(variant, salt);
+    try {
+      const plaintext = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        key,
+        data,
+      );
+      sessionKey = key;
+      sessionSalt = salt;
+      return validateVaultData(JSON.parse(new TextDecoder().decode(plaintext)));
+    } catch {
+      // Try the next spelling before giving up.
+    }
   }
-  sessionKey = key;
-  sessionSalt = salt;
-  return validateVaultData(JSON.parse(new TextDecoder().decode(plaintext)));
+  throw new Error(
+    "Senha mestra incorreta. Confira maiúsculas, acentos e espaços — e, se este cofre veio de outro aparelho, use a senha mestra de lá. Nada foi alterado.",
+  );
 }
 
 /** Encrypts the current records again with the key of the open session. */
@@ -222,7 +242,7 @@ export async function changePassphrase(
 ): Promise<StoredVault> {
   if (!sessionKey) throw new Error("O cofre está bloqueado.");
   const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
-  const key = await deriveKey(nextPassphrase, salt);
+  const key = await deriveKey(normalizePassphrase(nextPassphrase), salt);
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const plaintext = new TextEncoder().encode(
     JSON.stringify({ version: VAULT_VERSION, records } satisfies VaultData),
@@ -268,6 +288,30 @@ export function readStoredVault(): StoredVault | null {
     )
       return null;
     return stored;
+  } catch {
+    return null;
+  }
+}
+
+export const VAULT_CONFLICT_KEY = "multiapp.vault.v1.conflict";
+
+/**
+ * Keeps a local vault that uses another master passphrase instead of letting it
+ * overwrite the account copy. There is no UI to merge these yet; the envelope
+ * stays available under VAULT_CONFLICT_KEY for manual recovery.
+ */
+export function stashConflictingVault(stored: StoredVault): void {
+  try {
+    localStorage.setItem(VAULT_CONFLICT_KEY, JSON.stringify(stored));
+  } catch {
+    // Storage may be full; the account copy stays valid.
+  }
+}
+
+export function readConflictingVault(): StoredVault | null {
+  try {
+    const raw = localStorage.getItem(VAULT_CONFLICT_KEY);
+    return raw ? (JSON.parse(raw) as StoredVault) : null;
   } catch {
     return null;
   }

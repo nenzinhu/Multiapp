@@ -482,3 +482,39 @@ política é “o mais recente vence”, então o mais antigo precisa ser desblo
 com a senha mestra dele para ser reenviado. Sem teste com Postgres real neste
 recurso (o pooler do Supabase estava em timeout durante a sessão). O `DELETE` do
 vault remoto existe na API mas ainda não tem botão na interface.
+
+## 2026 refresh: “senha mestra incorreta” no celular
+
+Relato: no mobile a senha mestra era recusada mesmo sendo “a mesma” do desktop.
+Duas causas foram encontradas e tratadas:
+
+1. **Bytes diferentes com a mesma senha digitada**: a derivação PBKDF2 usava o
+   texto cru. Teclado de celular costuma acrescentar espaço no fim e pode emitir
+   acento decomposto (NFD) onde o desktop usou NFC. Agora o cofre normaliza com
+   `trim()` + `NFKC` ao criar/trocar a senha e, ao desbloquear, tenta a forma
+   normalizada, a aparada e a original — cofres antigos continuam abrindo.
+2. **Cofre diferente no aparelho**: se o celular já tinha um cofre local com
+   outra senha mestra, a sincronização podia empurrá-lo para a conta. Agora, se o
+   `salt` for diferente, a cópia da conta vence, o envelope local é guardado em
+   `multiapp.vault.v1.conflict` e o app avisa. A tela bloqueada também explica
+   quando o cofre veio de outro aparelho.
+
+Ajustes de teclado: `#vault-unlock`, `#passphrase-input`, `#passphrase-confirm` e
+`#vault-passphrase` ganharam `autoCapitalize="none"`, `autoCorrect="off"` e
+`spellCheck={false}`; o portão só oferece “Criar cofre” depois que a conta
+responde (antes ficava “Preparando o cofre…”), evitando criar um segundo cofre
+por engano. A mensagem de erro agora lembra de maiúsculas/acentos/espaços e do
+caso “veio de outro aparelho”.
+
+Teste de unidade novo: cofre criado com acento NFC abre com a versão NFD; senha
+criada com espaço no fim abre sem o espaço e com espaços dos dois lados;
+maíscula/minúscula continua sendo erro (57 passando, 1 integração ignorada).
+
+Verificação em dois navegadores (Chromium, 390x844 e 1280x900): o celular cria o
+cofre com `"mestre-forte-1 "` (espaço no fim) e sincroniza; o desktop digita
+`"mestre-forte-1"` e **abre** os registros, com a tela bloqueada explicando “Este
+cofre veio da sua conta…”. Sem erros de console.
+
+Limites: maiúsculas continuam relevantes; se a pessoa realmente usou outra
+senha mestra ao criar o cofre no celular, aquele cofre não abre o da conta — a
+cópia local fica guardada para recuperação manual, sem interface de restauração.

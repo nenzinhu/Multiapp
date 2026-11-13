@@ -144,3 +144,27 @@ test("findVaultLogin matches the site host, ignoring www and API keys", async ()
   assert.equal(findVaultLogin(null, "https://github.com/"), undefined);
   assert.equal(findVaultLogin(records, ""), undefined);
 });
+
+test("passphrase tolerates mobile keyboards: accents and stray spaces", async () => {
+  const { createVault, unlockVault, lockVault } = await import("../lib/vault.ts");
+
+  // Accents typed as NFD (common on phones) must open an NFC-created vault.
+  const accented = await createVault("coração-forte-1");
+  lockVault();
+  const opened = await unlockVault(accented, "coração-forte-1".normalize("NFD"));
+  assert.equal(opened.records.length, 0);
+
+  // A trailing space added by the keyboard still opens the vault.
+  const spaced = await createVault("senha-forte-1 ");
+  lockVault();
+  await assert.doesNotReject(unlockVault(spaced, "senha-forte-1"));
+  lockVault();
+  await assert.doesNotReject(unlockVault(spaced, "  senha-forte-1 "));
+
+  // Case still matters.
+  lockVault();
+  await assert.rejects(
+    unlockVault(spaced, "Senha-forte-1"),
+    /Senha mestra incorreta/,
+  );
+});
