@@ -52,6 +52,18 @@ export function databaseUrl(): string | null {
   return configured || null;
 }
 
+/** Safe description for diagnostics: never includes the password. */
+export function databaseTarget(): string | null {
+  const url = databaseUrl();
+  if (!url) return null;
+  try {
+    const config = parseDatabaseUrl(url);
+    return `${config.host}:${config.port}/${config.database}`;
+  } catch {
+    return "invalida";
+  }
+}
+
 export type PostgresConfig = {
   host: string;
   port: number;
@@ -337,6 +349,11 @@ export function createPostgresStorage(pool: Pool): Storage {
       } finally {
         client.release();
       }
+    },
+
+    async ping() {
+      await ready();
+      await pool.query("SELECT 1");
     },
 
     async close() {

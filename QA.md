@@ -221,3 +221,40 @@ Limites: a arte original é um mockup 3D com brilhos e uma textura hexagonal que
 não foi reproduzida pixel a pixel — o mark adapta o motivo "M" em gradiente para
 SVG. Sem teste em launcher Android real nem em barra de navegador com tema
 claro/escuro real.
+
+## 2026 refresh: cadastro falhando + entradas de painel com GSAP
+
+Relato: "ao cadastrar a senha falhou". O fluxo foi reproduzido localmente e
+estava correto nos dois drivers; a falha vem do ambiente, não do formulário.
+Três caminhos foram testados com o build de produção:
+
+| Cenário | Resultado |
+| --- | --- |
+| `DATABASE_URL` do pooler (Supabase) | `POST /api/auth/register` 201, `/api/health` ok |
+| sem `DATABASE_URL`, `MULTIAPP_DB_FILE` gravável | 201, health `storage: sqlite` |
+| `DATABASE_URL` com o host direto `db.<ref>.supabase.co` | 503 com mensagem que nomeia o host e pede o pooler (porta 6543) |
+
+Correções de robustez: o driver SQLite passou a ser importado sob demanda
+(`import()` dentro de `getStore`), então um deploy só-Postgres funciona mesmo em
+Node 18/20, onde `node:sqlite` não existe; `getStore()` virou assíncrono e todas
+as rotas aguardam; a mensagem de erro agora distingue URL ausente, host IPv6,
+senha recusada e disco somente leitura; e `GET /api/health` responde com driver,
+alvo (sem senha) e latência para diagnosticar em um clique. README ganhou a
+tabela de troubleshooting.
+
+Animação: `lib/panel-motion.ts` usa GSAP (`gsap.context`, `power3.out`) para a
+entrada dos painéis marcados com `data-panel-item` — história e cartão do login,
+navegação da sidebar, título da página, resumo, faixa de captura, prateleira de
+favoritos e cabeçalho da coleção. Cada execução limpa `opacity/transform`
+(`clearProps`) para não brigar com hover nem com o layout do Motion.
+
+Verificação da animação no navegador: amostrando `opacity` a cada 40 ms, o
+cabeçalho do cartão vai de 0.13 a 1 em ~0.6 s e termina sem estilo inline; com
+`prefers-reduced-motion: reduce` a opacidade fica em 1 o tempo todo e nenhum
+estilo inline é criado; na biblioteca a faixa de captura vai de 0 a 1 depois do
+login. Build, `tsc`, `lint` (só o aviso do favicon remoto) e `npm test` (41
+casos) sem erros.
+
+Limites: o erro original no ambiente do usuário não pôde ser observado
+diretamente (sem acesso ao painel de deploy); a conclusão vem dos três cenários
+reproduzidos e do novo `/api/health`.

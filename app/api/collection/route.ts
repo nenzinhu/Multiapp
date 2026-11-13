@@ -15,7 +15,8 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     const user = await requireUser(request);
-    const stored = await getStore().readCollection(user.id);
+    const store = await getStore();
+    const stored = await store.readCollection(user.id);
     return noStore(NextResponse.json({ user, ...stored }));
   } catch (error) {
     return errorResponse(error);
@@ -32,13 +33,15 @@ export async function PUT(request: Request) {
     const body = await readJson(request);
     const expected =
       typeof body.revision === "number" ? body.revision : undefined;
-    const saved = await getStore().writeCollection(user.id, body.collection, expected);
+    const store = await getStore();
+    const saved = await store.writeCollection(user.id, body.collection, expected);
     return noStore(NextResponse.json(saved));
   } catch (error) {
     if (error instanceof StoreError && error.code === "revision-conflict") {
       try {
         const user = await requireUser(request);
-        const current = await getStore().readCollection(user.id);
+        const store = await getStore();
+        const current = await store.readCollection(user.id);
         return noStore(
           NextResponse.json(
             {

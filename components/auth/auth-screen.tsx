@@ -1,10 +1,11 @@
 "use client";
 
 import { Eye, EyeOff, LockKeyhole, UserRound } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
 import { Logo } from "@/components/logo";
 import { ApiError, signIn, signUp, type AccountUser } from "@/lib/account";
+import { usePanelEntrance } from "@/lib/panel-motion";
 
 type Mode = "signin" | "signup";
 
@@ -25,6 +26,11 @@ export function AuthScreen({
   const [reveal, setReveal] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const storyRef = useRef<HTMLElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  usePanelEntrance(storyRef, { y: 20, stagger: 0.08, duration: 0.6 });
+  usePanelEntrance(cardRef, { y: 24, stagger: 0.07, duration: 0.5, delay: 0.06 });
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -67,24 +73,37 @@ export function AuthScreen({
 
   return (
     <main className="auth-shell">
-      <section className="auth-story" aria-labelledby="auth-story-title">
-        <Logo />
+      <section
+        className="auth-story"
+        aria-labelledby="auth-story-title"
+        ref={storyRef}
+      >
+        <div className="auth-story-top" data-panel-item>
+          <Logo />
+        </div>
         <div className="auth-story-body">
-          <h1 id="auth-story-title">
+          <h1 id="auth-story-title" data-panel-item>
             Todos os seus apps.
             <br />
             <span>Uma senha só.</span>
           </h1>
-          <p className="auth-lede">
+          <p className="auth-lede" data-panel-item>
             Entre e a sua biblioteca abre inteira, em qualquer aparelho.
           </p>
         </div>
-        <p className="auth-story-foot">Menos abas. Mais foco.</p>
+        <p className="auth-story-foot" data-panel-item>
+          Menos abas. Mais foco.
+        </p>
       </section>
 
       <section className="auth-panel" aria-labelledby="auth-title">
-        <div className="auth-card">
-          <div className="auth-tabs" role="group" aria-label="Entrar ou criar conta">
+        <div className="auth-card" ref={cardRef}>
+          <div
+            className="auth-tabs"
+            role="group"
+            aria-label="Entrar ou criar conta"
+            data-panel-item
+          >
             <button
               type="button"
               aria-pressed={mode === "signin"}
@@ -103,7 +122,7 @@ export function AuthScreen({
             </button>
           </div>
 
-          <header className="auth-head">
+          <header className="auth-head" data-panel-item>
             <h2 id="auth-title">
               {mode === "signin" ? "Entre para continuar" : "Crie sua conta"}
             </h2>
@@ -113,12 +132,12 @@ export function AuthScreen({
           </header>
 
           {notice && (
-            <p className="auth-notice" role="status">
+            <p className="auth-notice" role="status" data-panel-item>
               {notice}
             </p>
           )}
 
-          <form onSubmit={submit} noValidate>
+          <form onSubmit={submit} noValidate data-panel-item>
             <label htmlFor="auth-username">Usuário</label>
             <div className="auth-field">
               <UserRound size={17} aria-hidden="true" />

@@ -34,6 +34,8 @@ Built with [Next.js](https://nextjs.org) (App Router) and Tailwind CSS v4.
 - `POST /api/auth/logout` deletes the session of that device only.
 - `GET /api/auth/me` tells the UI whether the cookie still points at a session.
 - `GET /api/collection` returns the whole library of the signed account.
+- `GET /api/health` reports the active driver (`postgres`/`sqlite`), the target
+  host (never the password) and whether the database answers.
 - `PUT /api/collection` stores the whole library with a revision check.
 
 How the pieces fit:
@@ -183,7 +185,12 @@ an actionable message instead of pretending to save.
 
 Two libraries share the work, each where it is strongest:
 
-- **GSAP** (`gsap` + `@gsap/react`) animates the copy of the sidebar tabs. The
+- **GSAP** (`gsap` + `@gsap/react`) animates the copy of the sidebar tabs and the
+  entrance of the panels: `lib/panel-motion.ts` fades and lifts the children
+  marked `data-panel-item` (the login story and card, the shelf navigation, the
+  page heading, the summary, the capture strip, the favorites shelf and the
+  collection heading) with a short stagger, then clears every inline style so
+  hover and layout effects keep working. Reduced motion skips it entirely. The
   visible label is split into words and characters: the active tab replays a
   staggered entrance and hovering runs a short wave. The breadcrumb and the
   collection title reuse the same split text. The full string stays available
@@ -232,6 +239,23 @@ those reserved paths.
 - [Next.js documentation](https://nextjs.org/docs)
 - [Tailwind CSS v4](https://tailwindcss.com/docs)
 - [shadcn/ui](https://ui.shadcn.com)
+
+## Troubleshooting sign-up
+
+If "Criar conta" answers with an error, open `/api/health` first:
+
+| `health` says | What to do |
+| --- | --- |
+| `ok: true, storage: "postgres"` | The database is fine; the error is in the form (password under 8 characters, username already taken, and so on). |
+| `ok: false, code: "ENOTFOUND"`, target `db.<ref>.supabase.co` | You copied the direct URL, which is IPv6-only. Use *Connect → Transaction pooler* (`aws-1-<region>.pooler.supabase.com:6543`) and keep `?sslmode=require`. |
+| `ok: false, code: "28P01"` | Wrong database password in `DATABASE_URL`. |
+| `storage: "sqlite"`, `databaseUrl: "ausente"` on a serverless host | There is no persistent disk. Set `DATABASE_URL` in the hosting dashboard and redeploy. |
+| `storage: "sqlite"` with a read-only filesystem error | Point `MULTIAPP_DB_FILE` at a writable volume, or move to Postgres. |
+
+`DATABASE_URL` is read at runtime; after changing it in the hosting panel, a new
+deployment (or a restart, on a long-running server) picks it up. The SQLite
+driver is imported lazily, so a Postgres-only deployment also runs on Node 18/20
+where `node:sqlite` does not exist.
 
 ## Brand and icons
 

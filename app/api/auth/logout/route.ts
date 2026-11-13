@@ -16,7 +16,10 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const token = readCookie(request, SESSION_COOKIE);
-    if (token) await getStore().deleteSession(token);
+    if (token) {
+      const store = await getStore();
+      await store.deleteSession(token);
+    }
     const response = NextResponse.json({ ok: true, user: null });
     response.cookies.set({ ...sessionCookie(request, "", 0), maxAge: 0 });
     return noStore(response);
