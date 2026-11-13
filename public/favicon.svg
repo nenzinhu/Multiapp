@@ -1,4 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Multiapp">
-  <rect width="512" height="512" rx="120" fill="#d9f26b"/>
-  <path d="M108 347V239a74 74 0 0 1 148 0v108M256 347V239a74 74 0 0 1 148 0v108" fill="none" stroke="#123b31" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <linearGradient id="multiapp-mark" x1="70" y1="150" x2="440" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="0.35" stop-color="#3b82f6"/>
+      <stop offset="0.6" stop-color="#8b5cf6"/>
+      <stop offset="0.82" stop-color="#ec4899"/>
+      <stop offset="1" stop-color="#fb7185"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="#23262c"/>
+  <path d="M108 347V239a74 74 0 0 1 148 0v108M256 347V239a74 74 0 0 1 148 0v108" fill="none" stroke="url(#multiapp-mark)" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

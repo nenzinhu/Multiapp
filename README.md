@@ -245,6 +245,10 @@ those reserved paths.
 - `app/layout.tsx` — `theme-color`, Apple web app metadata and icon links
 
 Palette (runtime tokens in `app/globals.css`, documented in `DESIGN.md`):
-forest `#123b31`, lime `#d9f26b`, teal `#16735f`, canvas `#f2f6f2`, text
-`#14251f`. Focus ring `#2f8172` measures 4.27:1 on the canvas and 4.66:1 on
-white.
+charcoal canvas `#16181c`, cards `#1d2026`, shelf `#101216`, text `#e9edf4`,
+metadata `#9aa6b8`, links `#7aa2ff`, focus ring `#67e8f9` (12.3:1). The brand
+gradient `#22d3ee → #3b82f6 → #6366f1 → #a855f7 → #ec4899` is reserved for the
+mark, the wordmark, the primary button and the active navigation item.
+
+Icons are generated from `public/multiapp.svg`; keep the SVG and the PNGs in
+sync when the mark changes.

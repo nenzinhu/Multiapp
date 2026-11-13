@@ -182,3 +182,42 @@ Limites: o icon maskable não foi testado em um launcher Android real; a
 instalação PWA foi verificada pelo manifest servido, não pelo prompt de
 instalação. `favicon.ico` não é gerado (o `app/icon.svg` cobre navegadores
 modernos).
+
+## 2026 refresh: paleta da arte da marca (charcoal + gradiente)
+
+Pedido: usar a paleta da imagem da marca e aplicar o mesmo logo/favicon. A arte
+traz fundo charcoal, palavra "Multiapp" com gradiente e um favicon de tile
+escuro com um "M" em gradiente ciano → azul → violeta → rosa → coral.
+
+Marca: o SVG (e os PNGs 192/512/maskable/iPhone) passou a ser um tile charcoal
+`#262b33` com o "m" em gradiente (`#22d3ee`, `#3b82f6`, `#8b5cf6`, `#ec4899`,
+`#fb7185`) e traço 50/512; o wordmark usa o mesmo gradiente via
+`background-clip: text`. O favicon é o mesmo arquivo do logo.
+
+Tema: os tokens de `app/globals.css` viraram escuros — canvas `#16181c`,
+superfícies `#1d2026`, shelf `#101216`, bordas `#2e333c`, texto `#e9edf4`,
+metadados `#9aa6b8`, links `#7aa2ff` e foco `#67e8f9`. Uma camada "brand skin"
+no fim do arquivo aplica o gradiente na ação primária, no avatar, no item ativo
+da navegação, na captura, nos cards e na tela de entrada, além de escurecer
+toasts, banners, selects nativos (`color-scheme: dark`) e campos.
+
+Contrastes medidos: texto 15.14:1 no canvas e 13.90:1 na superfície; muted
+7.21:1 / 6.62:1; links 7.14:1; foco 12.26:1; rótulo escuro do botão gradiente
+10.59:1 (ciano), 5.20:1 (azul), 4.84:1 (violeta) e 5.43:1 (rosa); pills de
+categoria de 8.40:1 a 11.40:1; erro 5.90:1. Nenhum texto de corpo sobre o
+gradiente.
+
+Build: `npx tsc --noEmit`, `npm run lint` (só o aviso do favicon remoto),
+`npm run build` e `npm test` (41 casos) sem erros. `/icon.svg`, `/icon-192.png`,
+`/apple-icon.png` e `/manifest.webmanifest` seguem respondendo 200; manifest e
+`theme-color` agora usam `#16181c`.
+
+Navegador (Chromium, 1280x900 e 390x844): entrada (normal, criar conta e erro),
+biblioteca, cofre bloqueado, menu da conta, diálogo de app, diálogo de backup e
+lista foram revisados no tema escuro, sem overflow e sem erros de console. O
+favicon foi conferido em 16/32/64 px e continua legível.
+
+Limites: a arte original é um mockup 3D com brilhos e uma textura hexagonal que
+não foi reproduzida pixel a pixel — o mark adapta o motivo "M" em gradiente para
+SVG. Sem teste em launcher Android real nem em barra de navegador com tema
+claro/escuro real.
