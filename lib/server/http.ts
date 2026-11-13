@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { StoreError, type StoreUser } from "./accounts.ts";
-import { getStore } from "./store.ts";
+import { databaseTarget, getStore } from "./store.ts";
 
 export const SESSION_COOKIE = "multiapp_session";
 const MAX_BODY_BYTES = 5 * 1024 * 1024;
@@ -71,7 +71,8 @@ export function jsonError(status: number, message: string, code = "error"): Next
 export async function currentUser(request: Request): Promise<StoreUser | null> {
   const token = readCookie(request, SESSION_COOKIE);
   if (!token) return null;
-  return getStore().findSessionUser(token);
+  const store = await getStore();
+  return store.findSessionUser(token);
 }
 
 export async function requireUser(request: Request): Promise<StoreUser> {
@@ -124,9 +125,15 @@ export function errorResponse(error: unknown): NextResponse {
     )
   ) {
     console.error("[multiapp] banco de dados indisponível:", code, message);
+    const target = databaseTarget();
+    const hint = !target
+      ? "Configure DATABASE_URL (Supabase → Connect → Transaction pooler, porta 6543) ou um MULTIAPP_DB_FILE gravável."
+      : target.includes("supabase.co") && !target.includes("pooler")
+        ? `A URL direta do Supabase (${target}) só responde em IPv6; troque pela do pooler (porta 6543).`
+        : `Destino atual: ${target}. Confira usuário, senha e sslmode=require.`;
     return jsonError(
       503,
-      "O banco de dados está indisponível agora. Confira DATABASE_URL (no Supabase use a URL do pooler, porta 6543) e tente de novo.",
+      `Não foi possível falar com o banco de dados. ${hint}`,
       "database-unavailable",
     );
   }

@@ -68,6 +68,7 @@ import {
   type RemoteCollection,
 } from "@/lib/account";
 import { pop, shake } from "@/lib/animations";
+import { usePanelEntrance } from "@/lib/panel-motion";
 import {
   cacheKey,
   filterLinks,
@@ -184,6 +185,8 @@ export default function Home() {
   const savingRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
   const savedRef = useRef("");
+  const sidebarRef = useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const [categoryListRef] = useAutoAnimate<HTMLDivElement>({
     duration: 220,
     easing: "ease-out",
@@ -258,6 +261,22 @@ export default function Home() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // GSAP entrance for the shelf and the library panels (reduced motion skips it).
+  usePanelEntrance(sidebarRef, {
+    selector: ".main-nav button, .category-nav button, .new-category, .backup-nav",
+    active: Boolean(session),
+    y: 10,
+    stagger: 0.035,
+    duration: 0.45,
+  });
+  usePanelEntrance(mainRef, {
+    selector: "[data-panel-item]",
+    active: Boolean(session) && ready && section === "library",
+    y: 18,
+    stagger: 0.06,
+    duration: 0.5,
+  });
 
   function writeCache(userId: string, next: Collection) {
     try {
@@ -1074,7 +1093,7 @@ export default function Home() {
       <a className="skip-link" href="#collection">
         Ir para os apps
       </a>
-      <aside className="sidebar">
+      <aside className="sidebar" ref={sidebarRef}>
         <div className="brand-area">
           <Logo />
           <span className="personal-badge">PESSOAL</span>
@@ -1146,10 +1165,10 @@ export default function Home() {
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
-        <main>
+        <main ref={mainRef}>
           {section === "library" ? (
             <>
-            <motion.div className="page-heading" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="page-heading" data-panel-item>
               <div>
                 <div className="eyebrow">SEU PONTO DE PARTIDA</div>
                 <h1>
@@ -1165,7 +1184,7 @@ export default function Home() {
                 <Plus size={18} />
                 Adicionar app
               </button>
-            </motion.div>
+            </div>
             {syncError && (
               <div className="error-banner" role="alert">
                 {syncError}
@@ -1174,7 +1193,7 @@ export default function Home() {
                 </button>
               </div>
             )}
-            <div className="workspace-overview" aria-label="Resumo da biblioteca">
+            <div className="workspace-overview" aria-label="Resumo da biblioteca" data-panel-item>
               <span>
                 <LayoutGrid size={15} />
                 <strong>
@@ -1214,7 +1233,7 @@ export default function Home() {
               </span>
               <span className="overview-note"><span /> Organizado por você</span>
             </div>
-            <section className="capture-box" aria-label="Adicionar por URL">
+            <section className="capture-box" aria-label="Adicionar por URL" data-panel-item>
               <div className="capture-symbol" aria-hidden="true">
                 {quickPreview ? (
                   <SiteFavicon
@@ -1283,7 +1302,7 @@ export default function Home() {
               )}
             </section>
             {ready && favorites > 0 && view === "all" && !category && !query && (
-              <section className="favorites-shelf" aria-labelledby="favorites-title">
+              <section className="favorites-shelf" aria-labelledby="favorites-title" data-panel-item>
                 <div className="shelf-heading"><h2 id="favorites-title"><Star size={17} /> Seus favoritos</h2><button className="text-button" onClick={() => navigate("favorites")}>Ver favoritos <ArrowUpRight size={14} /></button></div>
                 <div className="favorite-shortcuts">
                   {collection.links.filter((link) => link.favorite).slice(0, 6).map((link) => (
@@ -1299,7 +1318,7 @@ export default function Home() {
               aria-labelledby="collection-title"
               className="collection-section"
             >
-              <div className="collection-heading">
+              <div className="collection-heading" data-panel-item>
                 <div>
                   <h2 id="collection-title">
                     <AnimatedText text={title} />

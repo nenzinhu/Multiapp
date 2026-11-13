@@ -43,6 +43,7 @@ export type Storage = {
     payload: unknown,
     expectedRevision?: number,
   ): Promise<StoredCollection>;
+  ping(): Promise<void>;
   close(): Promise<void>;
 };
 

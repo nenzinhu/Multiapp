@@ -185,6 +185,10 @@ export function createSqliteStorage(db: AppDatabase): Storage {
       return { collection, revision, updatedAt: now };
     },
 
+    async ping() {
+      db.prepare("SELECT 1").get();
+    },
+
     async close() {
       db.close();
     },

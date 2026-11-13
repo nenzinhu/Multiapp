@@ -41,7 +41,7 @@ export async function POST(request: Request) {
         "too-many-attempts",
       );
 
-    const store = getStore();
+    const store = await getStore();
     const user = await store.authenticateUser(body);
     resetRateLimit(key);
     const { token, maxAge } = await store.createSession(user.id);

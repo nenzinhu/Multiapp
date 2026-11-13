@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const body = await readJson(request);
-    const store = getStore();
+    const store = await getStore();
     const user = await store.createUser(body);
     const { token, maxAge } = await store.createSession(user.id);
     const response = NextResponse.json({ user }, { status: 201 });
