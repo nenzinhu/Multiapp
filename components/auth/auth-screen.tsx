@@ -26,6 +26,7 @@ export function AuthScreen({
   const [reveal, setReveal] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [diagnose, setDiagnose] = useState(false);
   const storyRef = useRef<HTMLElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -59,6 +60,9 @@ export function AuthScreen({
           : await signUp(username, password);
       onAuthenticated(result.user);
     } catch (failure) {
+      setDiagnose(
+        failure instanceof ApiError && failure.code.startsWith("database"),
+      );
       setError(
         failure instanceof ApiError
           ? failure.message
@@ -192,6 +196,11 @@ export function AuthScreen({
             {error && (
               <p id="auth-error" className="auth-error" role="alert">
                 {error}
+                {diagnose && (
+                  <a className="auth-diagnose" href="/setup">
+                    Abrir o diagnóstico da configuração
+                  </a>
+                )}
               </p>
             )}
 

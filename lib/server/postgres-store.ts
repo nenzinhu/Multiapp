@@ -52,15 +52,53 @@ export function databaseUrl(): string | null {
   return configured || null;
 }
 
+/**
+ * Vercel's Supabase/Postgres integrations inject the pieces instead of a URL:
+ * POSTGRES_HOST, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DATABASE. `pg` also
+ * understands the PGHOST family.
+ */
+export function databaseParts(): PostgresConfig | null {
+  const host = process.env.POSTGRES_HOST?.trim() || process.env.PGHOST?.trim();
+  if (!host) return null;
+  const user =
+    process.env.POSTGRES_USER?.trim() || process.env.PGUSER?.trim() || "postgres";
+  const password = process.env.POSTGRES_PASSWORD ?? process.env.PGPASSWORD ?? "";
+  const database =
+    process.env.POSTGRES_DATABASE?.trim() ||
+    process.env.PGDATABASE?.trim() ||
+    "postgres";
+  const port = Number(
+    process.env.POSTGRES_PORT?.trim() || process.env.PGPORT?.trim() || 5432,
+  );
+  const sslmode = process.env.PGSSLMODE;
+  return {
+    host,
+    port: Number.isFinite(port) && port > 0 ? port : 5432,
+    user,
+    password,
+    database,
+    ssl: sslmode !== "disable" && sslmode !== "allow",
+  };
+}
+
+export function hasDatabaseConfig(): boolean {
+  return Boolean(databaseUrl() || databaseParts());
+}
+
+/** Resolved connection settings, from the URL when present, else from parts. */
+export function databaseConfig(): PostgresConfig | null {
+  const url = databaseUrl();
+  if (url) return parseDatabaseUrl(url);
+  return databaseParts();
+}
+
 /** Safe description for diagnostics: never includes the password. */
 export function databaseTarget(): string | null {
-  const url = databaseUrl();
-  if (!url) return null;
   try {
-    const config = parseDatabaseUrl(url);
-    return `${config.host}:${config.port}/${config.database}`;
+    const config = databaseConfig();
+    return config ? `${config.host}:${config.port}/${config.database}` : null;
   } catch {
-    return "invalida";
+    return "DATABASE_URL invalida";
   }
 }
 
@@ -136,14 +174,13 @@ let schemaReady: Promise<void> | null = null;
 
 export function getPostgresPool(): Pool {
   if (sharedPool) return sharedPool;
-  const url = databaseUrl();
-  if (!url)
+  const config = databaseConfig();
+  if (!config)
     throw new StoreError(
       "database-missing",
       503,
-      "Defina DATABASE_URL para usar o Postgres.",
+      "Defina DATABASE_URL (ou POSTGRES_HOST/POSTGRES_USER/POSTGRES_PASSWORD) para usar o Postgres.",
     );
-  const config = parseDatabaseUrl(url);
   sharedPool = new Pool({
     host: config.host,
     port: config.port,

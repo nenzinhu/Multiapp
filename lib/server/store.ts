@@ -1,7 +1,8 @@
 import { StoreError, type Storage } from "./accounts.ts";
+import { hostingPlatform, whereToConfigure } from "./env.ts";
 import {
   createPostgresStorage,
-  databaseUrl,
+  hasDatabaseConfig,
   getPostgresPool,
 } from "./postgres-store.ts";
 
@@ -14,7 +15,7 @@ let shared: Storage | null = null;
 let loading: Promise<Storage> | null = null;
 
 async function open(): Promise<Storage> {
-  if (databaseUrl()) {
+  if (hasDatabaseConfig()) {
     shared = createPostgresStorage(getPostgresPool());
     return shared;
   }
@@ -33,7 +34,7 @@ async function open(): Promise<Storage> {
     throw new StoreError(
       "database-missing",
       503,
-      "Este servidor não tem DATABASE_URL nem SQLite disponível. Configure DATABASE_URL com a URL do pooler do Supabase (porta 6543) para criar contas e sincronizar os apps.",
+      `Este servidor não tem banco de dados configurado. Defina DATABASE_URL ${whereToConfigure()} (${hostingPlatform()}). Use a URL do pooler do Supabase, porta 6543, com ?sslmode=require. Diagnóstico sem senha em /setup.`,
     );
   }
 }
@@ -49,7 +50,7 @@ export async function getStore(): Promise<Storage> {
 }
 
 export function storageKind(): "postgres" | "sqlite" {
-  return databaseUrl() ? "postgres" : "sqlite";
+  return hasDatabaseConfig() ? "postgres" : "sqlite";
 }
 
 export async function resetStoreForTests(): Promise<void> {

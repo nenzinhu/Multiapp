@@ -17,7 +17,7 @@ User brief: save pasted webapp URLs, use favicons, stay compact and responsive. 
 | Account gate | components/auth/auth-screen.tsx | lib/server/store.ts rules | sign in, create account, reveal password | Unit + browser |
 | Sync status | save-status + account menu in app/page.tsx | lib/account.ts | sincronizado, salvando, sem conexão | Browser |
 | Panel entrance | lib/panel-motion.ts (GSAP) | This contract | login, shelf, library panels | Browser/reduced motion |
-| Health probe | app/api/health/route.ts | lib/server/store.ts | postgres/sqlite, target host | curl/browser |
+| Health probe | app/api/health/route.ts + app/setup/page.tsx | lib/server/env.ts | postgres/sqlite, target host, env names | curl/browser |
 | Vault gate | components/vault/vault-view.tsx | This contract | create, unlock, change master passphrase | Browser |
 | Vault record | components/vault/record-dialog.tsx | This contract | site credential, API key | Browser |
 | Provider catalog | components/vault/vault-view.tsx | lib/ai-providers.ts | free AI providers | Browser |

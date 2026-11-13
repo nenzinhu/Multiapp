@@ -258,3 +258,41 @@ casos) sem erros.
 Limites: o erro original no ambiente do usuário não pôde ser observado
 diretamente (sem acesso ao painel de deploy); a conclusão vem dos três cenários
 reproduzidos e do novo `/api/health`.
+
+## 2026 refresh: mensagem "sem DATABASE_URL nem SQLite"
+
+O usuário relatou exatamente a mensagem nova de 503. A causa é de ambiente: o
+host recebeu o deploy sem `DATABASE_URL` e roda uma versão de Node sem
+`node:sqlite`, então nenhum dos dois drivers estava disponível. O app não tem
+como criar uma conta sem banco — a correção é configurar a variável no painel.
+
+Para tirar o usuário do escuro, o diagnóstico passou a existir em dois lugares:
+
+- `GET /api/health` (JSON): driver ativo, alvo sem senha, plataforma detectada,
+  latência e o mapa de variáveis que o processo realmente recebeu (só nomes).
+- `GET /setup` (página pt-BR): status legível, o mesmo mapa e o passo a passo com
+  o nome do painel da plataforma (Vercel, Railway, Render, Fly.io, Netlify,
+  Koyeb) — a instrução muda conforme `VERCEL`, `RAILWAY_ENVIRONMENT`, `RENDER`,
+  `FLY_APP_NAME`, `NETLIFY` ou `KOYEB_APP_NAME`.
+
+Também passaram a ser aceitas as variáveis que as integrações injetam sem URL:
+`POSTGRES_HOST`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DATABASE`,
+`POSTGRES_PORT` e a família `PG*`. Assim um deploy criado pela integração
+Vercel + Supabase conecta sem renomear nada.
+
+Verificação com o build de produção:
+
+| Cenário | `/api/health` | Cadastro |
+| --- | --- | --- |
+| `DATABASE_URL` do pooler | ok, postgres, 336 ms | 201 |
+| sem URL e sem SQLite (host antigo) | 503 com dica por plataforma | 503 com a mesma dica |
+| `POSTGRES_*` do pooler, sem `DATABASE_URL` | ok, postgres, 308 ms | 201 |
+| `DATABASE_URL` inválida | 503, alvo "DATABASE_URL invalida" | 503 |
+| sem banco, Node 24 (SQLite local) | ok, sqlite | 201 |
+
+A página `/setup` foi capturada nos três estados (sqlite ok, postgres ok e URL
+inválida) e mostra status, driver, alvo, plataforma, erro e variáveis.
+`tsc`, `lint` (só o aviso do favicon remoto), `npm test` (41) e `build` sem erros.
+
+Limites: o painel do usuário não é acessível daqui, então a variável precisa ser
+criada por ele; `/setup` não escreve nada, apenas lê o ambiente do processo.

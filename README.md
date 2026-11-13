@@ -36,6 +36,8 @@ Built with [Next.js](https://nextjs.org) (App Router) and Tailwind CSS v4.
 - `GET /api/collection` returns the whole library of the signed account.
 - `GET /api/health` reports the active driver (`postgres`/`sqlite`), the target
   host (never the password) and whether the database answers.
+- `GET /setup` (page) renders the same diagnostics in Portuguese, with the
+  platform-specific next step and the list of variables the server received.
 - `PUT /api/collection` stores the whole library with a revision check.
 
 How the pieces fit:
@@ -57,12 +59,14 @@ How the pieces fit:
 
 ### Database
 
-| Variable             | Default             | Meaning                                        |
-| -------------------- | ------------------- | ---------------------------------------------- |
-| `DATABASE_URL`       | —                   | Postgres/Supabase URL; used when present       |
-| `MULTIAPP_DB_FILE`   | `.data/multiapp.db` | SQLite file when `DATABASE_URL` is absent      |
-| `TEST_DATABASE_URL`  | —                   | Enables the Postgres integration test          |
-| `PORT`               | `3000`              | Port used by `npm start`                       |
+| Variable             | Default             | Meaning                                             |
+| -------------------- | ------------------- | --------------------------------------------------- |
+| `DATABASE_URL`       | —                   | Postgres/Supabase URL; used when present            |
+| `POSTGRES_URL` / `SUPABASE_DB_URL` | —    | Accepted aliases for `DATABASE_URL`                 |
+| `POSTGRES_HOST` `POSTGRES_USER` `POSTGRES_PASSWORD` `POSTGRES_DATABASE` `POSTGRES_PORT` | — | Pieces injected by the Vercel/Supabase integrations; `PGHOST`/`PGUSER`/`PGPASSWORD`/`PGDATABASE`/`PGPORT` also work |
+| `MULTIAPP_DB_FILE`   | `.data/multiapp.db` | SQLite file when no Postgres is configured          |
+| `TEST_DATABASE_URL`  | —                   | Enables the Postgres integration test               |
+| `PORT`               | `3000`              | Port used by `npm start`                            |
 
 `lib/server/store.ts` picks the driver: Postgres when `DATABASE_URL` (or
 `POSTGRES_URL` / `SUPABASE_DB_URL`) is set, SQLite otherwise. Both implement the
@@ -251,6 +255,7 @@ If "Criar conta" answers with an error, open `/api/health` first:
 | `ok: false, code: "28P01"` | Wrong database password in `DATABASE_URL`. |
 | `storage: "sqlite"`, `databaseUrl: "ausente"` on a serverless host | There is no persistent disk. Set `DATABASE_URL` in the hosting dashboard and redeploy. |
 | `storage: "sqlite"` with a read-only filesystem error | Point `MULTIAPP_DB_FILE` at a writable volume, or move to Postgres. |
+| `Este servidor não tem banco de dados configurado` | The host received neither a Postgres URL nor a `node:sqlite` runtime. Set `DATABASE_URL` in the hosting panel and redeploy; `/setup` shows the platform-specific path and which variables arrived. |
 
 `DATABASE_URL` is read at runtime; after changing it in the hosting panel, a new
 deployment (or a restart, on a long-running server) picks it up. The SQLite
