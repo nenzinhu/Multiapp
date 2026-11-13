@@ -46,6 +46,7 @@ import {
   mergeVaultRecords,
   readStoredVault,
   rememberVaultRecords,
+  stashConflictingVault,
   sealRecords,
   unlockVault,
   vaultDomain,
@@ -125,6 +126,9 @@ function PassphraseDialog({
               autoFocus
               type="password"
               autoComplete="off"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               maxLength={200}
               value={passphrase}
               onChange={(event) => {
@@ -140,6 +144,9 @@ function PassphraseDialog({
                 id="passphrase-confirm"
                 type="password"
                 autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 maxLength={200}
                 value={confirmation}
                 onChange={(event) => {
@@ -182,6 +189,7 @@ export function VaultView({ section }: { section: VaultSection }) {
   const [busy, setBusy] = React.useState(false);
   const [unlockValue, setUnlockValue] = React.useState("");
   const [importOpen, setImportOpen] = React.useState(false);
+  const [adoptedRemote, setAdoptedRemote] = React.useState(false);
   const [syncState, setSyncState] = React.useState<
     "loading" | "synced" | "saving" | "offline"
   >("loading");
@@ -205,10 +213,6 @@ export function VaultView({ section }: { section: VaultSection }) {
     null,
   );
 
-  React.useEffect(() => {
-    setStatus(readStoredVault() ? "locked" : "setup");
-  }, []);
-
   // Reconcile the local envelope with the account copy. Only sealed data
   // travels; adopting a newer remote copy is what makes a new device work.
   React.useEffect(() => {
@@ -222,24 +226,50 @@ export function VaultView({ section }: { section: VaultSection }) {
         if (!remote.vault) {
           if (local) await pushSealed(local);
           else setSyncState("synced");
+          setStatus(readStoredVault() ? "locked" : "setup");
           return;
         }
         if (!local || remote.vault.updatedAt > local.updatedAt) {
           writeStoredVault(remote.vault);
           setStatus("locked");
           setRecords([]);
-          if (local)
-            notify("O cofre da sua conta é mais recente e foi atualizado aqui.");
+          setAdoptedRemote(true);
+          if (local && local.salt !== remote.vault.salt)
+            notify(
+              "O cofre da sua conta veio de outro aparelho. Desbloqueie com a senha mestra usada lá.",
+              undefined,
+              true,
+            );
+          else if (local) notify("O cofre da sua conta é mais recente e foi atualizado aqui.");
           setSyncState("synced");
           return;
         }
         if (local.updatedAt > remote.vault.updatedAt) {
+          if (local.salt !== remote.vault.salt) {
+            // Different master passphrase on this device: never overwrite the
+            // account copy, keep the local envelope for recovery.
+            stashConflictingVault(local);
+            writeStoredVault(remote.vault);
+            setStatus("locked");
+            setAdoptedRemote(true);
+            setSyncState("synced");
+            notify(
+              "Este aparelho tinha um cofre com outra senha mestra. Abrimos o da conta e guardamos o local para recuperação.",
+              undefined,
+              true,
+            );
+            return;
+          }
           await pushSealed(local);
+          setStatus("locked");
           return;
         }
         setSyncState("synced");
+        setStatus("locked");
       } catch {
-        if (!cancelled) setSyncState("offline");
+        if (cancelled) return;
+        setSyncState("offline");
+        setStatus(readStoredVault() ? "locked" : "setup");
       }
     })();
     return () => {
@@ -580,10 +610,9 @@ export function VaultView({ section }: { section: VaultSection }) {
           </span>
           <h3>Crie seu cofre</h3>
           <p>
-            O cofre guarda senhas de sites e chaves de API criptografadas
-            (AES-GCM) e sincronizado como ciphertext na sua conta. A senha mestra
-            nunca é guardada: se você
-            esquecer, não existe como recuperar.
+            O cofre guarda senhas de sites e chaves de API com AES-GCM e sobe
+            para a sua conta apenas como ciphertext. A senha mestra nunca é
+            guardada: se você esquecer, não existe como recuperar.
           </p>
           <button
             className="button primary"
@@ -602,7 +631,11 @@ export function VaultView({ section }: { section: VaultSection }) {
           <Lock size={22} />
         </span>
         <h3>Cofre bloqueado</h3>
-        <p>Digite a senha mestra para abrir os registros.</p>
+        <p>
+          {adoptedRemote
+            ? "Este cofre veio da sua conta: use a senha mestra que você usa nos outros aparelhos."
+            : "Digite a senha mestra para abrir os registros."}
+        </p>
         <form
           className="vault-unlock-form"
           noValidate
@@ -615,6 +648,9 @@ export function VaultView({ section }: { section: VaultSection }) {
             id="vault-unlock"
             type="password"
             autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             placeholder="Senha mestra"
             aria-label="Senha mestra"
             value={unlockValue}

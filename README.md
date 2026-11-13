@@ -171,10 +171,16 @@ an actionable message instead of pretending to save.
 - The vault lives in its own `localStorage` key (`multiapp.vault.v1`) and holds
   only ciphertext: records are sealed with AES-GCM-256 and the key is derived
   from the master passphrase with PBKDF2-HMAC-SHA256 (210.000 rounds).
+- The master passphrase is compared after `trim()` + Unicode NFKC, so a stray
+  space or a decomposed accent from a phone keyboard still opens the same vault
+  (the normalized form is what seals new vaults; legacy vaults are tried raw).
 - The vault **is synced as ciphertext only**: the sealed envelope (salt, IV and
   AES-GCM ciphertext) is stored for the account in `vaults`, so a second device
   can unlock it with the same master passphrase. The server never receives the
-  passphrase or a plaintext record, and the pinning is revision-based.
+  passphrase or a plaintext record, and the pinning is revision-based. A vault
+  created separately on two devices has different salts; the account copy wins,
+  and the local envelope is kept under `multiapp.vault.v1.conflict` instead of
+  overwriting it.
 - The master passphrase is never stored. If it is forgotten the records
   cannot be recovered — export the vault regularly.
 - The vault starts locked on every page load and can be locked again with the
