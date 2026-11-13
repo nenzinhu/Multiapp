@@ -93,6 +93,15 @@ export function databaseConfig(): PostgresConfig | null {
 }
 
 /** Safe description for diagnostics: never includes the password. */
+export function databaseUser(): string | null {
+  try {
+    return databaseConfig()?.user ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Safe description for diagnostics: never includes the password. */
 export function databaseTarget(): string | null {
   try {
     const config = databaseConfig();
@@ -121,11 +130,26 @@ function decode(value: string): string {
 }
 
 /**
+ * Panels often receive `KEY=value` or a quoted value; both are forgiven here so
+ * a copy-paste does not become a cryptic DNS error.
+ */
+function cleanUrl(raw: string): string {
+  let value = raw.trim();
+  value = value.replace(/^[A-Za-z0-9_]+\s*=\s*/, "");
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  )
+    value = value.slice(1, -1);
+  return value.trim();
+}
+
+/**
  * Accepts a normal `postgres://` URL and also the Supabase form whose password
  * may carry `@` or brackets without escaping.
  */
 export function parseDatabaseUrl(raw: string): PostgresConfig {
-  const trimmed = raw.trim();
+  const trimmed = cleanUrl(raw);
   const match = /^postgres(?:ql)?:\/\/([\s\S]+)$/i.exec(trimmed);
   if (!match)
     throw new StoreError(
@@ -156,6 +180,12 @@ export function parseDatabaseUrl(raw: string): PostgresConfig {
       "database-url-invalid",
       503,
       "DATABASE_URL está incompleta: faltam host ou usuário.",
+    );
+  if (/^\d+[a-z]/i.test(host))
+    throw new StoreError(
+      "database-url-invalid",
+      503,
+      "A URL do banco perdeu o '@' entre a senha e o host. O formato é postgresql://USUARIO:SENHA@HOST:6543/postgres?sslmode=require — se a senha tiver '@', escreva %40.",
     );
 
   const sslmode = query.get("sslmode");

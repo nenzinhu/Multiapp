@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { environmentReport, hostingPlatform, whereToConfigure } from "@/lib/server/env";
-import { databaseTarget, getStore, storageKind } from "@/lib/server/store";
+import {
+  databaseTarget,
+  databaseUser,
+  getStore,
+  storageKind,
+} from "@/lib/server/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +24,7 @@ export async function GET() {
     storage: kind,
     databaseUrl: configured ? "configurada" : "ausente",
     target: databaseTarget(),
+    user: databaseUser(),
     platform: hostingPlatform(),
     env: environmentReport(),
   };

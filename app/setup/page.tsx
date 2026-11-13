@@ -3,7 +3,12 @@ import Link from "next/link";
 
 import { Logo } from "@/components/logo";
 import { environmentReport, hostingPlatform, whereToConfigure } from "@/lib/server/env";
-import { databaseTarget, getStore, storageKind } from "@/lib/server/store";
+import {
+  databaseTarget,
+  databaseUser,
+  getStore,
+  storageKind,
+} from "@/lib/server/store";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +24,7 @@ export const metadata: Metadata = {
 export default async function SetupPage() {
   const kind = storageKind();
   const target = databaseTarget();
+  const user = databaseUser();
   const env = environmentReport();
   let ok = false;
   let detail = "";
@@ -54,6 +60,10 @@ export default async function SetupPage() {
           <div>
             <dt>Alvo</dt>
             <dd>{target ?? "nenhum"}</dd>
+          </div>
+          <div>
+            <dt>Usuário</dt>
+            <dd>{user ?? "—"}</dd>
           </div>
           <div>
             <dt>Plataforma</dt>

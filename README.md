@@ -86,7 +86,9 @@ Supabase's project page offers three connection strings:
   used here; copy it from *Connect* and keep `?sslmode=require`.
 
 The password may contain `@` or `%`; the app accepts the raw string as copied
-from the dashboard and also the percent-encoded form (`@` → `%40`). `sslmode`
+from the dashboard and also the percent-encoded form (`@` → `%40`). A pasted
+`DATABASE_URL=...` prefix or surrounding quotes are ignored, and a URL that lost
+the `@` before the host is reported as such instead of a DNS error. `sslmode`
 other than `disable`/`allow` turns TLS on with `rejectUnauthorized: false`, which
 is what Supabase's pooler certificate requires.
 
@@ -256,6 +258,7 @@ If "Criar conta" answers with an error, open `/api/health` first:
 | `storage: "sqlite"`, `databaseUrl: "ausente"` on a serverless host | There is no persistent disk. Set `DATABASE_URL` in the hosting dashboard and redeploy. |
 | `storage: "sqlite"` with a read-only filesystem error | Point `MULTIAPP_DB_FILE` at a writable volume, or move to Postgres. |
 | `Este servidor não tem banco de dados configurado` | The host received neither a Postgres URL nor a `node:sqlite` runtime. Set `DATABASE_URL` in the hosting panel and redeploy; `/setup` shows the platform-specific path and which variables arrived. |
+| `A URL do banco perdeu o '@' entre a senha e o host` | The value lost the separator before the host. The format is `postgresql://USER:PASSWORD@HOST:6543/postgres?sslmode=require`; an `@` inside the password must be written `%40`. |
 
 `DATABASE_URL` is read at runtime; after changing it in the hosting panel, a new
 deployment (or a restart, on a long-running server) picks it up. The SQLite
