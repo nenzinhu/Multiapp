@@ -44,6 +44,61 @@ const IV_BYTES = 12;
 let sessionKey: CryptoKey | null = null;
 let sessionSalt: Uint8Array<ArrayBuffer> | null = null;
 
+/**
+ * Decrypted records for the current page session. They live only in memory,
+ * never in storage: the library uses them to offer a one-click login for the
+ * apps that already have a credential, and a lock wipes them.
+ */
+let sessionRecords: VaultRecord[] | null = null;
+const sessionListeners = new Set<() => void>();
+
+function emitVaultSession(): void {
+  for (const listener of sessionListeners) listener();
+}
+
+export function rememberVaultRecords(records: VaultRecord[]): void {
+  sessionRecords = records;
+  emitVaultSession();
+}
+
+export function forgetVaultRecords(): void {
+  if (!sessionRecords) return;
+  sessionRecords = null;
+  emitVaultSession();
+}
+
+export function getVaultRecords(): VaultRecord[] | null {
+  return sessionRecords;
+}
+
+/** Subscription for `useSyncExternalStore`; returns the unsubscribe. */
+export function subscribeVaultSession(listener: () => void): () => void {
+  sessionListeners.add(listener);
+  return () => {
+    sessionListeners.delete(listener);
+  };
+}
+
+/**
+ * The site credential that matches an app URL: same host after `www.`, with a
+ * user and a secret. API keys never match a site card.
+ */
+export function findVaultLogin(
+  records: VaultRecord[] | null | undefined,
+  url: string,
+): VaultRecord | undefined {
+  if (!records?.length || !url) return undefined;
+  const host = vaultDomain(url);
+  if (!host) return undefined;
+  return records.find(
+    (record) =>
+      record.kind === "site" &&
+      Boolean(record.username) &&
+      Boolean(record.secret) &&
+      vaultDomain(record.url) === host,
+  );
+}
+
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
   bytes.forEach((byte) => {
@@ -191,6 +246,8 @@ export async function changePassphrase(
 export function lockVault(): void {
   sessionKey = null;
   sessionSalt = null;
+  sessionRecords = null;
+  emitVaultSession();
 }
 
 export function isVaultUnlocked(): boolean {

@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -69,6 +70,15 @@ import {
 } from "@/lib/account";
 import { shake } from "@/lib/animations";
 import { usePanelEntrance } from "@/lib/panel-motion";
+import {
+  findVaultLogin,
+  getVaultRecords,
+  readStoredVault,
+  rememberVaultRecords,
+  subscribeVaultSession,
+  unlockVault,
+  type VaultRecord,
+} from "@/lib/vault";
 import {
   cacheKey,
   filterLinks,
@@ -277,6 +287,139 @@ export default function Home() {
     stagger: 0.06,
     duration: 0.5,
   });
+
+  const vaultRecords = useSyncExternalStore(
+    subscribeVaultSession,
+    getVaultRecords,
+    () => null,
+  );
+  const [clipboard, setClipboard] = useState<{
+    record: VaultRecord;
+    seconds: number;
+  } | null>(null);
+  const [vaultPrompt, setVaultPrompt] = useState<AppLink | null>(null);
+  const [vaultPassphrase, setVaultPassphrase] = useState("");
+  const [vaultPromptError, setVaultPromptError] = useState("");
+  const [vaultBusy, setVaultBusy] = useState(false);
+  const [vaultStored, setVaultStored] = useState(false);
+  const clipboardRef = useRef<typeof clipboard>(null);
+  clipboardRef.current = clipboard;
+
+  useEffect(() => {
+    setVaultStored(Boolean(readStoredVault()));
+  }, [ready, section, vaultRecords, session]);
+
+  useEffect(() => {
+    if (!clipboard) return;
+    if (clipboard.seconds <= 0) {
+      void clearClipboard();
+      return;
+    }
+    const timer = window.setTimeout(
+      () => setClipboard((current) =>
+        current ? { ...current, seconds: current.seconds - 1 } : current,
+      ),
+      1000,
+    );
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clipboard]);
+
+  useEffect(() => {
+    const onHide = () => {
+      if (clipboardRef.current) void clearClipboard();
+    };
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function loginFor(link: AppLink): VaultRecord | undefined {
+    return findVaultLogin(vaultRecords, link.url);
+  }
+
+  async function copyText(value: string): Promise<void> {
+    if (!navigator.clipboard?.writeText)
+      throw new Error("Seu navegador não liberou a área de transferência.");
+    await navigator.clipboard.writeText(value);
+  }
+
+  async function clearClipboard(announce = false) {
+    const current = clipboardRef.current;
+    setClipboard(null);
+    if (!current) return;
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text === current.record.secret) await navigator.clipboard.writeText("");
+    } catch {
+      // Reading the clipboard may be blocked; nothing else to clear safely.
+    }
+    if (announce) notify("Área de transferência limpa.");
+  }
+
+  async function copyVaultLogin(link: AppLink, record?: VaultRecord) {
+    const match = record ?? loginFor(link);
+    if (!match) {
+      requestVaultUnlock(link);
+      return;
+    }
+    try {
+      await copyText(match.secret);
+      setClipboard({ record: match, seconds: 30 });
+    } catch {
+      setNotice({
+        message:
+          "Não foi possível copiar a senha. Abra o cofre e copie manualmente.",
+        error: true,
+      });
+    }
+  }
+
+  function requestVaultUnlock(link: AppLink) {
+    if (!readStoredVault()) {
+      setNotice({
+        message:
+          "Crie o cofre em Senhas de sites para guardar logins e copiar em um clique.",
+        error: true,
+      });
+      setSection("sites");
+      return;
+    }
+    setVaultPassphrase("");
+    setVaultPromptError("");
+    setVaultPrompt(link);
+  }
+
+  async function submitVaultUnlock(event: FormEvent) {
+    event.preventDefault();
+    if (!vaultPrompt || vaultBusy) return;
+    const stored = readStoredVault();
+    if (!stored) {
+      setVaultPrompt(null);
+      return;
+    }
+    setVaultBusy(true);
+    setVaultPromptError("");
+    try {
+      const data = await unlockVault(stored, vaultPassphrase);
+      rememberVaultRecords(data.records);
+      const match = findVaultLogin(data.records, vaultPrompt.url);
+      const target = vaultPrompt;
+      setVaultPrompt(null);
+      if (match) await copyVaultLogin(target, match);
+      else
+        setNotice({
+          message: `Nenhuma credencial guardada para ${new URL(target.url).hostname}.`,
+          error: true,
+        });
+    } catch (error) {
+      setVaultPromptError(
+        (error as Error).message || "Senha mestra incorreta.",
+      );
+    } finally {
+      setVaultBusy(false);
+    }
+  }
 
   function writeCache(userId: string, next: Collection) {
     try {
@@ -1451,7 +1594,7 @@ export default function Home() {
                 >
                   <AnimatePresence initial={false}>
                   {visible.map((link, index) => (
-                    <motion.article layout={!reduceMotion ? "position" : false} className="app-card" key={link.id}
+                    <motion.article layout={!reduceMotion ? "position" : false} className={`app-card${loginFor(link) ? " has-login" : ""}`} key={link.id}
                       initial={{ opacity: 0, y: reduceMotion ? 0 : 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: reduceMotion ? 1 : 0.96 }}
                       transition={{ opacity: { duration: 0.16 }, y: { duration: 0.24, delay: Math.min(index, 10) * 0.025 }, layout: { duration: 0.22 } }}
                       whileHover={reduceMotion ? undefined : { y: -2 }}
@@ -1471,7 +1614,7 @@ export default function Home() {
                               className={`category-dot ${link.category === UNCATEGORIZED ? "gray" : categoryColors[Math.max(0, collection.categories.indexOf(link.category)) % categoryColors.length]}`}
                               aria-hidden="true"
                             />
-                            {link.name}
+                            <span className="card-label">{link.name}</span>
                           </span>
                           <span className="card-domain">
                             {new URL(link.url).hostname.replace(/^www\./, "")}
@@ -1487,6 +1630,16 @@ export default function Home() {
                         <span className="sr-only"> — abrir em nova aba</span>
                       </a>
                       <div className="card-actions">
+                        {loginFor(link) && (
+                          <button
+                            className="icon-button card-key"
+                            aria-label={`Copiar senha de ${link.name} do cofre`}
+                            title="Copiar login do cofre"
+                            onClick={() => void copyVaultLogin(link)}
+                          >
+                            <KeyRound size={13} />
+                          </button>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger
                             className="icon-button card-menu"
@@ -1502,6 +1655,16 @@ export default function Home() {
                                 ? "Remover dos favoritos"
                                 : "Favoritar"}
                             </DropdownMenuItem>
+                            {(loginFor(link) || vaultStored) && (
+                              <DropdownMenuItem
+                                onSelect={() => void copyVaultLogin(link)}
+                              >
+                                <KeyRound size={15} />
+                                {loginFor(link)
+                                  ? "Copiar login do cofre"
+                                  : "Desbloquear e copiar login"}
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onSelect={() => openEditor(link)}>
                               <Pencil size={15} />
                               Editar app
@@ -1887,6 +2050,101 @@ export default function Home() {
           Favicons são fornecidos pelo Google a partir do domínio do app.
         </p>
       </Modal>
+      <Modal
+        open={Boolean(vaultPrompt)}
+        onOpenChange={(open) => {
+          if (!open) setVaultPrompt(null);
+        }}
+        title="Desbloquear o cofre"
+        description="A senha mestra abre o cofre só nesta aba para copiar o login."
+      >
+        <form onSubmit={submitVaultUnlock} noValidate>
+          <div className="field">
+            <label htmlFor="vault-passphrase">Senha mestra</label>
+            <input
+              id="vault-passphrase"
+              type="password"
+              autoComplete="current-password"
+              autoFocus
+              value={vaultPassphrase}
+              aria-invalid={Boolean(vaultPromptError)}
+              aria-describedby={
+                vaultPromptError ? "vault-prompt-error" : undefined
+              }
+              onChange={(event) => {
+                setVaultPassphrase(event.target.value);
+                setVaultPromptError("");
+              }}
+            />
+          </div>
+          {vaultPromptError && (
+            <p id="vault-prompt-error" role="alert" className="field-error">
+              {vaultPromptError}
+            </p>
+          )}
+          <p className="field-help">
+            A senha mestra não sai deste navegador. Depois de copiar, o cofre
+            continua aberto até você bloquear.
+          </p>
+          <div className="dialog-actions">
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => setVaultPrompt(null)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="button primary"
+              disabled={vaultBusy}
+            >
+              {vaultBusy ? "Abrindo…" : "Desbloquear e copiar"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+      {clipboard && (
+        <div className="clipboard-card" role="status" aria-live="polite">
+          <span className="clipboard-icon" aria-hidden="true">
+            <ShieldCheck size={15} />
+          </span>
+          <div>
+            <strong>{clipboard.record.title}</strong>
+            <span>
+              senha copiada · limpa em {clipboard.seconds}s
+            </span>
+          </div>
+          {clipboard.record.username && (
+            <button
+              className="button secondary"
+              onClick={() => {
+                void copyText(clipboard.record.username)
+                  .then(() => {
+                    notify("Usuário copiado. A senha saiu da área de transferência.");
+                    void clearClipboard();
+                  })
+                  .catch(() =>
+                    setNotice({
+                      message: "Não foi possível copiar o usuário.",
+                      error: true,
+                    }),
+                  );
+              }}
+            >
+              Copiar usuário
+            </button>
+          )}
+          <button
+            className="icon-button"
+            aria-label="Limpar a senha da área de transferência"
+            title="Limpar agora"
+            onClick={() => void clearClipboard(true)}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
       <div
         className="toast-region"
         role="status"

@@ -41,6 +41,7 @@ import {
   maskSecret,
   mergeVaultRecords,
   readStoredVault,
+  rememberVaultRecords,
   sealRecords,
   unlockVault,
   vaultDomain,
@@ -229,6 +230,7 @@ export function VaultView({ section }: { section: VaultSection }) {
     const sealed = await sealRecords(next);
     writeStoredVault(sealed);
     setRecords(next);
+    rememberVaultRecords(next);
   }
 
   async function handleCreate(passphrase: string, confirmation: string) {
@@ -245,6 +247,7 @@ export function VaultView({ section }: { section: VaultSection }) {
       const stored = await createVault(passphrase);
       writeStoredVault(stored);
       setRecords([]);
+      rememberVaultRecords([]);
       setPassphraseMode(null);
       setStatus("unlocked");
       setError("");
@@ -266,6 +269,7 @@ export function VaultView({ section }: { section: VaultSection }) {
     try {
       const data = await unlockVault(stored, passphrase);
       setRecords(data.records);
+      rememberVaultRecords(data.records);
       setStatus("unlocked");
       setError("");
     } catch (caught) {
