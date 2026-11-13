@@ -117,3 +117,30 @@ test("vaultDomain reads the hostname without the www prefix", () => {
   assert.equal(vaultDomain(""), "");
   assert.equal(vaultDomain("não é uma url"), "não é uma url");
 });
+
+test("findVaultLogin matches the site host, ignoring www and API keys", async () => {
+  const { findVaultLogin } = await import("../lib/vault.ts");
+  const site = {
+    id: "v1",
+    kind: "site",
+    title: "GitHub",
+    url: "https://www.github.com/login",
+    username: "nei",
+    secret: "segredo",
+    notes: "",
+    providerId: "",
+    favorite: false,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  const api = { ...site, id: "v2", kind: "api", url: "https://github.com" };
+  const noUser = { ...site, id: "v3", username: "" };
+  const records = [api, noUser, site];
+
+  assert.equal(findVaultLogin(records, "https://github.com/")?.id, "v1");
+  assert.equal(findVaultLogin(records, "https://www.github.com/x")?.id, "v1");
+  assert.equal(findVaultLogin(records, "https://github.com.br/"), undefined);
+  assert.equal(findVaultLogin(records, "https://gist.github.com/"), undefined);
+  assert.equal(findVaultLogin(null, "https://github.com/"), undefined);
+  assert.equal(findVaultLogin(records, ""), undefined);
+});

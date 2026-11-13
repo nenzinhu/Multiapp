@@ -120,7 +120,7 @@ export function errorResponse(error: unknown): NextResponse {
       "XX000",
       "EAI_AGAIN",
     ].includes(code) ||
-    /SQLITE|database|readonly|EROFS|EACCES|ENOSPC|unable to open|password authentication|timeout exceeded when trying to connect|getaddrinfo/i.test(
+    /SQLITE|database|readonly|EROFS|EACCES|ENOSPC|unable to open|password authentication|connection terminated|connection timeout|timeout exceeded when trying to connect|getaddrinfo/i.test(
       message,
     )
   ) {

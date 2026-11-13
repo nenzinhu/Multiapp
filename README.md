@@ -181,7 +181,14 @@ an actionable message instead of pretending to save.
   tier and links to their console. Free quotas change often, so confirm the
   limits in the provider panel.
 - Secrets are masked by default (`••••••1234`), can be revealed one at a time
-  and can be copied to the clipboard. Vault entries never request favicons, so
+  and can be copied to the clipboard.
+- **Login em um clique:** while the vault is unlocked, the library marks every
+  app whose host has a site credential with a key button. One click copies the
+  password and shows a card with a 30-second countdown, a "Copiar usuário"
+  action and "Limpar agora"; the clipboard is wiped when the timer ends, when
+  the tab is closed or when the vault is locked. With the vault locked, the tile
+  menu offers "Desbloquear e copiar login", asking for the master passphrase
+  without leaving the library. Vault entries never request favicons, so
   no hostname leaves the browser.
 - "Exportar" writes the encrypted envelope to a JSON file; "Importar" asks for
   the passphrase of the imported file and merges the records, keeping the ones

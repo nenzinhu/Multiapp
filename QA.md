@@ -367,3 +367,39 @@ O tile "Adicionar app" acompanhou (147x44, rotulo em uma linha) e a grade mantev
 o gap de 9px. Medido no Chromium 1280x900 e 390x844: 6 e 2 colunas, sem
 overflow horizontal, sem erros de console; `tsc`, `lint`, `npm test` (43) e
 `build` sem erros.
+
+## 2026 refresh: login em 1 clique pelo cofre
+
+Ideia escolhida da lista: o cofre encontra o cartão do app e copia a senha sem
+sair da biblioteca.
+
+Como funciona: ao desbloquear o cofre, os registros ficam em memória
+(`lib/vault.ts`, `rememberVaultRecords`) e a biblioteca assina esse estado com
+`useSyncExternalStore`. `findVaultLogin` casa host exato (ignorando `www.`) e só
+considera registros `kind: "site"` com usuário e segredo. O tile ganha um botão
+de chave; o menu ganha "Copiar login do cofre" (ou "Desbloquear e copiar
+login" quando bloqueado, que abre um diálogo de senha mestra e copia na hora).
+
+Clipboard: a senha vai para a área de transferência e um cartão fixo mostra
+`senha copiada · limpa em 30s`, com "Copiar usuário" e "Limpar agora". A limpeza
+confere se o conteúdo ainda é o nosso antes de apagar, e também roda em
+`pagehide` e no bloqueio do cofre. Nada é renderizado: só cópia.
+
+Verificado no Chromium com permissões de clipboard (1280x900):
+
+| Passo | Resultado |
+| --- | --- |
+| Cofre criado + credencial do GitHub guardada | 1 botão de chave no tile do GitHub |
+| Clique na chave | clipboard = `senha-super-secreta-1`; cartão com "limpa em 30s" |
+| Recarregar a página (cofre bloqueado) | 0 chaves; menu mostra "Desbloquear e copiar login" |
+| Desbloquear pelo diálogo | clipboard = a mesma senha |
+| "Limpar agora" | clipboard vazio |
+
+Testes: `findVaultLogin` cobre `www.`, subdomínio diferente, chave de API
+excluída, usuário vazio e URL vazia (44 passando, 1 integração Postgres
+ignorada). `tsc`, `lint` e `build` sem erros.
+
+Limites: permissão de clipboard varia por navegador (Safari pode pedir gesto a
+mais); a cópia sequencial usuário+senha não é possível — a senha fica no
+clipboard e o usuário tem um botão próprio. O segredo permanece na memória da
+aba por até 30s enquanto o cartão está aberto.
