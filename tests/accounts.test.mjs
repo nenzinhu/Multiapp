@@ -205,3 +205,66 @@ test("the same credentials read the same collection from a new session", async (
   assert.notEqual(first.token, second.token);
 });
 
+
+test("vault envelope syncs with a revision and can be deleted", async () => {
+  const { storage } = freshStore();
+  const user = await storage.createUser({ username: "vault.sync", password: "senha-forte-1" });
+  assert.equal(await storage.readVault(user.id), null);
+
+  const envelope = { version: 1, salt: "salt-1", iv: "iv-1", data: "cifrado", updatedAt: 100 };
+  const saved = await storage.writeVault(user.id, envelope, 0);
+  assert.equal(saved.revision, 1);
+
+  const read = await storage.readVault(user.id);
+  assert.deepEqual(read.envelope, envelope);
+  assert.equal(read.revision, 1);
+
+  await assert.rejects(
+    storage.writeVault(user.id, envelope, 0),
+    (error) => error instanceof StoreError && error.code === "revision-conflict",
+  );
+
+  const newer = { ...envelope, data: "cifrado-2", updatedAt: 200 };
+  const second = await storage.writeVault(user.id, newer, 1);
+  assert.equal(second.revision, 2);
+  assert.equal((await storage.readVault(user.id)).envelope.data, "cifrado-2");
+
+  await storage.deleteVault(user.id);
+  assert.equal(await storage.readVault(user.id), null);
+});
+
+test("vault envelopes are rejected when malformed or too large", async () => {
+  const { storage } = freshStore();
+  const user = await storage.createUser({ username: "vault.bad", password: "senha-forte-1" });
+  const bad = [
+    null,
+    { version: 2, salt: "s", iv: "i", data: "d", updatedAt: 1 },
+    { version: 1, salt: "", iv: "i", data: "d", updatedAt: 1 },
+    { version: 1, salt: "s", iv: "i", data: "d", updatedAt: "agora" },
+    { version: 1, salt: "s", iv: "i", data: "d" },
+  ];
+  for (const envelope of bad)
+    await assert.rejects(storage.writeVault(user.id, envelope, 0));
+
+  const huge = {
+    version: 1,
+    salt: "s",
+    iv: "i",
+    data: "x".repeat(4 * 1024 * 1024 + 1),
+    updatedAt: 1,
+  };
+  await assert.rejects(storage.writeVault(user.id, huge, 0), /4 MB/);
+});
+
+test("each account has its own vault copy", async () => {
+  const { storage } = freshStore();
+  const ana = await storage.createUser({ username: "vault.ana", password: "senha-forte-1" });
+  const bia = await storage.createUser({ username: "vault.bia", password: "senha-forte-1" });
+  await storage.writeVault(
+    ana.id,
+    { version: 1, salt: "s", iv: "i", data: "segredo-de-ana", updatedAt: 1 },
+    0,
+  );
+  assert.equal(await storage.readVault(bia.id), null);
+  assert.equal((await storage.readVault(ana.id)).envelope.data, "segredo-de-ana");
+});

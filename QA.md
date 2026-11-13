@@ -439,3 +439,46 @@ Postgres ignorada) e `build` sem erros.
 Limites: sem importação de `.1pux` (1Password só via CSV) e sem CSV criptografado
 do Bitwarden. Senhas não são exibidas na prévia; o arquivo importado não fica em
 disco (lido em memória). Sem teste com arquivo real de 5.000 linhas.
+
+## 2026 refresh: cofre sincronizado entre aparelhos (zero-knowledge)
+
+Pedido: fazer a ideia #5 — o cofre sai de um navegador só sem entregar segredo ao
+servidor.
+
+Desenho: o servidor guarda apenas o **envelope selado** (`salt`, `iv`, `data` do
+AES-GCM, `updatedAt`) por conta, com revisão. A senha mestra nunca sai do
+dispositivo; a chave é derivada de PBKDF2 no navegador. Ao abrir a seção, o app
+reconcilia:
+
+- sem cópia remota → envia a local (ou nada, se também não houver);
+- remota mais nova → adota no `localStorage` e mantém o cofre bloqueado para
+  desbloquear com a senha mestra;
+- local mais nova → envia com a revisão atual;
+- empate → mantém a local. Conflito de revisão (409) devolve o envelope atual e o
+  cliente adota se for mais novo, senão reenvia uma vez.
+
+Superfície: `GET/PUT/DELETE /api/vault`, `vaults` nas duas implementações de
+armazenamento (SQLite e Postgres), `pullVault`/`pushVault` no cliente e o status
+na faixa do cofre (“Verificando…”, “Salvando…”, “Criptografado e sincronizado”,
+“Só neste aparelho — sem conexão”).
+
+Testes: envelope com revisão, conflito, remoção, validação (versão, campos
+vazios, `updatedAt` inválido, 4 MB) e isolamento entre contas (56 passando, 1
+integração Postgres ignorada). Build, `tsc` e `lint` sem erros.
+
+Verificação em dois navegadores (Chromium, 1280x900 e 390x844), SQLite local:
+
+| Passo | Resultado |
+| --- | --- |
+| Aparelho A: cria cofre e guarda GitHub | status “Criptografado e sincronizado” |
+| `GET /api/vault` no A | revisão 2, envelope de 404 bytes, **sem o texto da senha** |
+| Aparelho B (contexto novo): entra na mesma conta | cofre “Cofre bloqueado” (envelope remoto adotado) |
+| B desbloqueia com a mesma senha mestra | 1 registro: GitHub · github.com · ••••••-123 |
+| B volta à biblioteca | botão de chave no tile do GitHub |
+| Arquivo SQLite (`sync.db` e `-wal`) | 0 ocorrências da senha em texto |
+
+Limites: cofres criados separadamente em dois aparelhos têm sais diferentes; a
+política é “o mais recente vence”, então o mais antigo precisa ser desbloqueado
+com a senha mestra dele para ser reenviado. Sem teste com Postgres real neste
+recurso (o pooler do Supabase estava em timeout durante a sessão). O `DELETE` do
+vault remoto existe na API mas ainda não tem botão na interface.

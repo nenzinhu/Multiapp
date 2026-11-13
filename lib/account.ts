@@ -144,3 +144,75 @@ export async function pushCollection(
     updatedAt: payload?.updatedAt ?? Date.now(),
   };
 }
+
+/** Sealed vault envelope shared with the account (opaque to the server). */
+export type VaultEnvelope = {
+  version: 1;
+  salt: string;
+  iv: string;
+  data: string;
+  updatedAt: number;
+};
+
+export type RemoteVault = {
+  vault: VaultEnvelope | null;
+  revision: number;
+};
+
+export type VaultPushResult =
+  | { ok: true; vault: VaultEnvelope; revision: number }
+  | { ok: false; conflict: true; vault: VaultEnvelope | null; revision: number };
+
+export function pullVault(): Promise<RemoteVault> {
+  return request("/api/vault");
+}
+
+export async function pushVault(
+  vault: VaultEnvelope,
+  revision: number,
+): Promise<VaultPushResult> {
+  let response: Response;
+  try {
+    response = await fetch("/api/vault", {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vault, revision }),
+    });
+  } catch {
+    throw new ApiError(
+      "Sem conexão com o servidor. O cofre continua neste aparelho.",
+      0,
+      "network",
+    );
+  }
+  const payload = (await response.json().catch(() => null)) as
+    | {
+        vault?: VaultEnvelope | null;
+        revision?: number;
+        error?: { message?: string; code?: string };
+      }
+    | null;
+  if (response.status === 409)
+    return {
+      ok: false,
+      conflict: true,
+      vault: payload?.vault ?? null,
+      revision: payload?.revision ?? 0,
+    };
+  if (!response.ok)
+    throw new ApiError(
+      payload?.error?.message || "Não foi possível sincronizar o cofre agora.",
+      response.status,
+      payload?.error?.code || "error",
+    );
+  return {
+    ok: true,
+    vault: payload?.vault as VaultEnvelope,
+    revision: payload?.revision ?? revision + 1,
+  };
+}
+
+export function deleteRemoteVault(): Promise<{ ok: true }> {
+  return request("/api/vault", { method: "DELETE" });
+}

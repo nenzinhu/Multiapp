@@ -28,6 +28,15 @@ CREATE TABLE IF NOT EXISTS collections (
   data TEXT NOT NULL,
   updated_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS vaults (
+  user_id TEXT PRIMARY KEY,
+  revision INTEGER NOT NULL,
+  salt TEXT NOT NULL,
+  iv TEXT NOT NULL,
+  data TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
 `;
 
 /**

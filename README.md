@@ -34,6 +34,8 @@ Built with [Next.js](https://nextjs.org) (App Router) and Tailwind CSS v4.
 - `POST /api/auth/logout` deletes the session of that device only.
 - `GET /api/auth/me` tells the UI whether the cookie still points at a session.
 - `GET /api/collection` returns the whole library of the signed account.
+- `GET /api/vault` / `PUT /api/vault` / `DELETE /api/vault` sync and remove the
+  **sealed** vault envelope of the account (ciphertext only).
 - `GET /api/health` reports the active driver (`postgres`/`sqlite`), the target
   host (never the password) and whether the database answers.
 - `GET /setup` (page) renders the same diagnostics in Portuguese, with the
@@ -169,8 +171,10 @@ an actionable message instead of pretending to save.
 - The vault lives in its own `localStorage` key (`multiapp.vault.v1`) and holds
   only ciphertext: records are sealed with AES-GCM-256 and the key is derived
   from the master passphrase with PBKDF2-HMAC-SHA256 (210.000 rounds).
-- The vault is deliberately **not** synced with the account: it stays on this
-  browser, so no secret ever reaches the server.
+- The vault **is synced as ciphertext only**: the sealed envelope (salt, IV and
+  AES-GCM ciphertext) is stored for the account in `vaults`, so a second device
+  can unlock it with the same master passphrase. The server never receives the
+  passphrase or a plaintext record, and the pinning is revision-based.
 - The master passphrase is never stored. If it is forgotten the records
   cannot be recovered — export the vault regularly.
 - The vault starts locked on every page load and can be locked again with the

@@ -13,6 +13,7 @@ import {
   toUser,
   usernameKey,
   validatePassword,
+  validateVaultEnvelope,
   type Storage,
   type StoreUser,
   type StoredCollection,
@@ -39,6 +40,15 @@ CREATE INDEX IF NOT EXISTS sessions_user ON sessions (user_id);
 CREATE TABLE IF NOT EXISTS collections (
   user_id text PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   revision integer NOT NULL,
+  data text NOT NULL,
+  updated_at bigint NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS vaults (
+  user_id text PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  revision integer NOT NULL,
+  salt text NOT NULL,
+  iv text NOT NULL,
   data text NOT NULL,
   updated_at bigint NOT NULL
 );
@@ -421,6 +431,76 @@ export function createPostgresStorage(pool: Pool): Storage {
     async ping() {
       await ready();
       await pool.query("SELECT 1");
+    },
+
+    async readVault(userId) {
+      await ready();
+      const result = await pool.query(
+        "SELECT revision, salt, iv, data, updated_at FROM vaults WHERE user_id = $1",
+        [userId],
+      );
+      const row = result.rows[0] as
+        | { revision: string | number; salt: string; iv: string; data: string; updated_at: string | number }
+        | undefined;
+      if (!row) return null;
+      return {
+        envelope: {
+          version: 1 as const,
+          salt: row.salt,
+          iv: row.iv,
+          data: row.data,
+          updatedAt: Number(row.updated_at),
+        },
+        revision: Number(row.revision),
+      };
+    },
+
+    async writeVault(userId, payload, expectedRevision) {
+      await ready();
+      const envelope = validateVaultEnvelope(payload);
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const current = await client.query(
+          "SELECT revision FROM vaults WHERE user_id = $1 FOR UPDATE",
+          [userId],
+        );
+        const revision = current.rows[0] ? Number(current.rows[0].revision) : 0;
+        if (expectedRevision !== undefined && expectedRevision !== revision)
+          throw new StoreError(
+            "revision-conflict",
+            409,
+            "O cofre mudou em outro aparelho. Recarregue para ver a versão mais recente.",
+          );
+        const next = revision + 1;
+        await client.query(
+          `INSERT INTO vaults (user_id, revision, salt, iv, data, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (user_id) DO UPDATE
+             SET revision = EXCLUDED.revision,
+                 salt = EXCLUDED.salt,
+                 iv = EXCLUDED.iv,
+                 data = EXCLUDED.data,
+                 updated_at = EXCLUDED.updated_at`,
+          [userId, next, envelope.salt, envelope.iv, envelope.data, envelope.updatedAt],
+        );
+        await client.query("COMMIT");
+        return { envelope, revision: next };
+      } catch (error) {
+        try {
+          await client.query("ROLLBACK");
+        } catch {
+          // Transaction already gone.
+        }
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async deleteVault(userId) {
+      await ready();
+      await pool.query("DELETE FROM vaults WHERE user_id = $1", [userId]);
     },
 
     async close() {
