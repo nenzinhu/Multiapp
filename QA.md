@@ -518,3 +518,33 @@ cofre veio da sua conta…”. Sem erros de console.
 Limites: maiúsculas continuam relevantes; se a pessoa realmente usou outra
 senha mestra ao criar o cofre no celular, aquele cofre não abre o da conta — a
 cópia local fica guardada para recuperação manual, sem interface de restauração.
+
+## 2026 refresh: recuperar o cofre antigo de um aparelho
+
+Complemento do ajuste anterior: quando o aparelho tem um cofre com `salt`
+diferente, a sincronização guarda o envelope em `multiapp.vault.v1.conflict` e a
+cópia da conta vence. Agora existe uma saída para não perder aqueles registros.
+
+- Banner âmbar em **Senhas de sites**: “Cofre antigo guardado neste aparelho” com
+  **Recuperar** e um botão de descarte (com Desfazer).
+- `decryptVault(stored, passphrase)` abre o envelope antigo **sem mexer na sessão**
+  (a chave/salt do cofre atual continuam valendo para salvar), então os registros
+  são mesclados por host+usuário (`mergeImportedRecords`), salvos e sincronizados
+  e o stash é apagado.
+- `clearConflictingVault()` remove o stash; o descarte usa o mesmo toast com
+  Desfazer para recolocar o envelope.
+
+Teste de unidade novo: `decryptVault` devolve os registros de um cofre com outra
+senha mestra, **não** desbloqueia a sessão (o cofre atual continua selando) e
+recusa senha errada (58 passando, 1 integração ignorada).
+
+Verificação no Chromium: conta A cria um cofre com `antiga-forte-1` e a credencial
+Notion; essa envelope é injetada como conflito na conta B, que cria um cofre novo
+com `atual-forte-1` e a credencial Figma. O banner aparece, **Recuperar** com a
+senha antiga traz “1 registro trazido do cofre antigo”, a lista passa a ter
+Figma + Notion (2 linhas), o banner desaparece e o console fica limpo.
+
+Limites: a mesclagem mantém a versão já existente quando host+usuário coincidem
+(não compara a senha); não há restauração de chaves de API de um stash para a
+seção de provedores além do merge normal (elas entram no cofre e aparecem na
+seção).
