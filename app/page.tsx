@@ -67,7 +67,7 @@ import {
   type AccountUser,
   type RemoteCollection,
 } from "@/lib/account";
-import { pop, shake } from "@/lib/animations";
+import { shake } from "@/lib/animations";
 import { usePanelEntrance } from "@/lib/panel-motion";
 import {
   cacheKey,
@@ -1452,86 +1452,74 @@ export default function Home() {
                   <AnimatePresence initial={false}>
                   {visible.map((link, index) => (
                     <motion.article layout={!reduceMotion ? "position" : false} className="app-card" key={link.id}
-                      initial={{ opacity: 0, y: reduceMotion ? 0 : 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: reduceMotion ? 1 : 0.96 }}
-                      transition={{ opacity: { duration: 0.18 }, y: { duration: 0.3, delay: Math.min(index, 7) * 0.035 }, layout: { duration: 0.25 } }}
-                      whileHover={reduceMotion ? undefined : { y: -4 }}
+                      initial={{ opacity: 0, y: reduceMotion ? 0 : 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: reduceMotion ? 1 : 0.96 }}
+                      transition={{ opacity: { duration: 0.16 }, y: { duration: 0.24, delay: Math.min(index, 10) * 0.025 }, layout: { duration: 0.22 } }}
+                      whileHover={reduceMotion ? undefined : { y: -2 }}
                     >
-                      <div className="card-top">
-                        <SiteFavicon key={link.url} url={link.url} name={link.name} />
-                        <div className="card-actions">
-                          <button
-                            className={`icon-button favorite-button ${link.favorite ? "is-favorite" : ""}`}
-                            aria-label={
-                              link.favorite
-                                ? `Remover ${link.name} dos favoritos`
-                                : `Favoritar ${link.name}`
-                            }
-                            aria-pressed={link.favorite}
-                            title={
-                              link.favorite
-                                ? "Remover dos favoritos"
-                                : "Favoritar"
-                            }
-                            onClick={(event) => {
-                              pop(event.currentTarget);
-                              toggleFavorite(link);
-                            }}
-                          >
-                            <Star size={16} />
-                          </button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              className="icon-button"
-                              aria-label={`Opções de ${link.name}`}
-                              title="Opções do app"
-                            >
-                              <MoreHorizontal size={19} />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="app-menu">
-                              <DropdownMenuItem onSelect={() => openEditor(link)}>
-                                <Pencil size={15} />
-                                Editar app
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => copyLink(link.url)}
-                              >
-                                <Copy size={15} />
-                                Copiar URL
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                variant="destructive"
-                                onSelect={() => removeLink(link)}
-                              >
-                                <Trash2 size={15} />
-                                Remover app
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
                       <a
                         className="card-link"
                         href={link.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        title={`Abrir ${link.name} em nova aba: ${link.url}`}
+                        title={`Abrir ${link.name} (${link.category}) em nova aba: ${link.url}`}
                         onClick={() => recordOpen(link)}
                       >
-                        <h3>{link.name}</h3>
-                        <span className="card-domain">
-                          {new URL(link.url).hostname.replace(/^www\./, "")}
+                        <SiteFavicon key={link.url} url={link.url} name={link.name} size={22} />
+                        <span className="card-text">
+                          <span className="card-name">
+                            <span
+                              className={`category-dot ${link.category === UNCATEGORIZED ? "gray" : categoryColors[Math.max(0, collection.categories.indexOf(link.category)) % categoryColors.length]}`}
+                              aria-hidden="true"
+                            />
+                            {link.name}
+                          </span>
+                          <span className="card-domain">
+                            {new URL(link.url).hostname.replace(/^www\./, "")}
+                          </span>
                         </span>
-                        <ArrowUpRight className="open-arrow" size={17} />
+                        {link.favorite && (
+                          <Star
+                            className="card-favorite"
+                            size={11}
+                            aria-label="Favorito"
+                          />
+                        )}
                         <span className="sr-only"> — abrir em nova aba</span>
                       </a>
-                      <div className="card-footer">
-                        <span
-                          className={`category-pill ${categoryColors[Math.max(0, collection.categories.indexOf(link.category)) % categoryColors.length]}`}
-                        >
-                          <span />
-                          {link.category}
-                        </span>
+                      <div className="card-actions">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            className="icon-button card-menu"
+                            aria-label={`Opções de ${link.name}`}
+                            title="Opções do app"
+                          >
+                            <MoreHorizontal size={15} />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="app-menu">
+                            <DropdownMenuItem onSelect={() => toggleFavorite(link)}>
+                              <Star size={15} />
+                              {link.favorite
+                                ? "Remover dos favoritos"
+                                : "Favoritar"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => openEditor(link)}>
+                              <Pencil size={15} />
+                              Editar app
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => copyLink(link.url)}>
+                              <Copy size={15} />
+                              Copiar URL
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onSelect={() => removeLink(link)}
+                            >
+                              <Trash2 size={15} />
+                              Remover app
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </motion.article>
                   ))}

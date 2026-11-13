@@ -2897,3 +2897,176 @@ progress {
     padding: 22px 18px;
   }
 }
+
+/* Dense library: small tiles, many more apps per screen (≈70% smaller) */
+.app-grid {
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 8px;
+}
+.app-card {
+  display: flex;
+  align-items: center;
+  min-height: 0;
+  padding: 0;
+  border-radius: 10px;
+}
+.app-card:hover {
+  box-shadow: 0 6px 16px #00000059;
+}
+.card-link {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 30px 7px 8px;
+}
+.card-link:after {
+  border-radius: 10px;
+}
+.card-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+.card-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  color: #e9edf4;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.card-name .category-dot {
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
+}
+.card-domain {
+  display: none;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  margin: 0;
+  padding: 0;
+}
+.card-favorite {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: #fbbf24;
+  fill: #fbbf2433;
+}
+.app-card .favicon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+.card-actions {
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  margin: 0;
+  transform: translateY(-50%);
+  z-index: 3;
+}
+.card-actions .icon-button {
+  width: 24px;
+  height: 24px;
+  color: #8b98ab;
+}
+.app-card:hover .card-actions .icon-button,
+.card-actions .icon-button[aria-expanded="true"] {
+  color: #cbd5e1;
+}
+.card-footer,
+.open-arrow,
+.card-top {
+  display: none;
+}
+
+/* The add tile follows the same compact rhythm */
+.add-card {
+  min-height: 0;
+  flex-direction: row;
+  gap: 8px;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+.add-card > span {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+.add-card > span svg {
+  width: 13px;
+  height: 13px;
+}
+.add-card strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+.add-card small {
+  display: none;
+}
+
+/* Touch keeps a 44px target without losing the dense look */
+@media (pointer: coarse) {
+  .card-link {
+    min-height: 44px;
+  }
+  .add-card {
+    min-height: 44px;
+  }
+}
+
+/* List mode keeps a second line with the domain */
+.list-view .card-domain {
+  display: block;
+}
+.list-view .app-card {
+  min-height: 0;
+}
+.list-view .card-link {
+  padding: 8px 32px 8px 9px;
+}
+.list-view .card-name {
+  font-size: 12.5px;
+}
+
+@media (max-width: 800px) {
+  .app-grid {
+    grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+    gap: 7px;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 7px;
+  }
+  .app-card {
+    display: flex;
+  }
+  .card-link {
+    grid-column: auto;
+    grid-row: auto;
+    padding: 7px 28px 7px 7px;
+  }
+  .card-actions {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .card-name {
+    font-size: 11.5px;
+  }
+}
