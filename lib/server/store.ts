@@ -9,7 +9,7 @@ import {
 export type { Storage } from "./accounts.ts";
 export { StoreError } from "./accounts.ts";
 export type { StoreUser, StoredCollection } from "./accounts.ts";
-export { databaseTarget } from "./postgres-store.ts";
+export { databaseTarget, databaseUser } from "./postgres-store.ts";
 
 let shared: Storage | null = null;
 let loading: Promise<Storage> | null = null;

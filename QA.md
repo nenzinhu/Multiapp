@@ -296,3 +296,28 @@ inválida) e mostra status, driver, alvo, plataforma, erro e variáveis.
 
 Limites: o painel do usuário não é acessível daqui, então a variável precisa ser
 criada por ele; `/setup` não escreve nada, apenas lê o ambiente do processo.
+
+## 2026 refresh: valor do DATABASE_URL colado errado na Vercel
+
+O valor enviado pelo usuário era
+`postgresql://postgres.<ref>:***Nei@6280760aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require`:
+faltava o `@` entre a senha e o host, e a senha tem `@` (que precisa virar `%40`
+numa URL). O parser antigo aceitava a string, tomava o último `@` como
+separador e tentava resolver o host `6280760aws-1-...`, terminando em ENOTFOUND.
+
+Correções: `parseDatabaseUrl` agora ignora um prefixo `KEY=` e aspas ao redor do
+valor (copiar/colar de painel), e detecta host começando por dígitos seguidos de
+letra — o sintoma de `@` perdido — devolvendo uma mensagem que mostra o formato
+correto e lembra do `%40`. `/api/health` e `/setup` exibem também o usuário
+resolvido, para conferir a URL sem expor a senha.
+
+Verificado com o build de produção, exatamente o valor do usuário: 503 com
+`code: database-url-invalid` e a mensagem do `@`; `/setup` renderiza o mesmo
+texto em destaque. Com o valor corrigido
+(`...:***Nei%406280760@aws-1-us-east-1.pooler.supabase.com:6543/...`) o health
+responde ok, alvo e usuário corretos, e `POST /api/auth/register` devolve 201.
+`npm test` agora com 43 casos (novos: prefixo `KEY=`, valor entre aspas, senha
+com `@` cru e URL sem o `@`). `tsc`, `lint` e `build` sem erros.
+
+Limites: a correção do valor na Vercel é manual (o app só diagnostica); a senha
+segue a mesma, então vale rotacioná-la depois.

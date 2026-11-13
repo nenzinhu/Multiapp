@@ -116,3 +116,30 @@ test("postgres: accounts, sessions and snapshots round trip", { skip }, async (t
   await storage.deleteSession(first.token);
   assert.equal(await storage.findSessionUser(first.token), null);
 });
+
+test("parseDatabaseUrl forgives a pasted KEY=value and surrounding quotes", () => {
+  const fromPanel = parseDatabaseUrl(
+    'DATABASE_URL="postgresql://postgres.abc:senha@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require"',
+  );
+  assert.equal(fromPanel.host, "aws-1-us-east-1.pooler.supabase.com");
+  assert.equal(fromPanel.port, 6543);
+  assert.equal(fromPanel.password, "senha");
+});
+
+test("parseDatabaseUrl explains a URL that lost the @ before the host", () => {
+  assert.throws(
+    () =>
+      parseDatabaseUrl(
+        "postgresql://postgres.abc:***Nei@6280760aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require",
+      ),
+    /perdeu o '@' entre a senha e o host/,
+  );
+});
+
+test("parseDatabaseUrl keeps the full password when it contains @", () => {
+  const config = parseDatabaseUrl(
+    "postgresql://postgres.abc:***Nei@6280760@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require",
+  );
+  assert.equal(config.password, "***Nei@6280760");
+  assert.equal(config.host, "aws-1-us-east-1.pooler.supabase.com");
+});
