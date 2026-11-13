@@ -184,10 +184,14 @@ export async function createVault(
 }
 
 /** Derives the key from the master passphrase and decrypts the vault. */
-export async function unlockVault(
+/**
+ * Opens an envelope without touching the session: used to recover a stashed
+ * vault that was sealed with another master passphrase.
+ */
+async function openEnvelope(
   stored: StoredVault,
   passphrase: string,
-): Promise<VaultData> {
+): Promise<{ data: VaultData; key: CryptoKey; salt: Uint8Array<ArrayBuffer> }> {
   const salt = fromBase64(stored.salt);
   const iv = fromBase64(stored.iv);
   const data = fromBase64(stored.data);
@@ -199,9 +203,11 @@ export async function unlockVault(
         key,
         data,
       );
-      sessionKey = key;
-      sessionSalt = salt;
-      return validateVaultData(JSON.parse(new TextDecoder().decode(plaintext)));
+      return {
+        data: validateVaultData(JSON.parse(new TextDecoder().decode(plaintext))),
+        key,
+        salt,
+      };
     } catch {
       // Try the next spelling before giving up.
     }
@@ -209,6 +215,28 @@ export async function unlockVault(
   throw new Error(
     "Senha mestra incorreta. Confira maiúsculas, acentos e espaços — e, se este cofre veio de outro aparelho, use a senha mestra de lá. Nada foi alterado.",
   );
+}
+
+/**
+ * Opens an envelope without touching the session: used to recover a stashed
+ * vault that was sealed with another master passphrase.
+ */
+export async function decryptVault(
+  stored: StoredVault,
+  passphrase: string,
+): Promise<VaultData> {
+  const opened = await openEnvelope(stored, passphrase);
+  return opened.data;
+}
+
+export async function unlockVault(
+  stored: StoredVault,
+  passphrase: string,
+): Promise<VaultData> {
+  const opened = await openEnvelope(stored, passphrase);
+  sessionKey = opened.key;
+  sessionSalt = opened.salt;
+  return opened.data;
 }
 
 /** Encrypts the current records again with the key of the open session. */
@@ -305,6 +333,14 @@ export function stashConflictingVault(stored: StoredVault): void {
     localStorage.setItem(VAULT_CONFLICT_KEY, JSON.stringify(stored));
   } catch {
     // Storage may be full; the account copy stays valid.
+  }
+}
+
+export function clearConflictingVault(): void {
+  try {
+    localStorage.removeItem(VAULT_CONFLICT_KEY);
+  } catch {
+    // Nothing to clear.
   }
 }
 

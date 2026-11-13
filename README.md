@@ -180,7 +180,10 @@ an actionable message instead of pretending to save.
   passphrase or a plaintext record, and the pinning is revision-based. A vault
   created separately on two devices has different salts; the account copy wins,
   and the local envelope is kept under `multiapp.vault.v1.conflict` instead of
-  overwriting it.
+  overwriting it. When that happens, **Senhas de sites** shows a "Cofre antigo
+  guardado neste aparelho" banner: enter that vault's master passphrase and its
+  records are decrypted locally, merged into the account (deduplicated by host +
+  user) and the stash is deleted. Dismissing the banner (with Undo) also works.
 - The master passphrase is never stored. If it is forgotten the records
   cannot be recovered — export the vault regularly.
 - The vault starts locked on every page load and can be locked again with the

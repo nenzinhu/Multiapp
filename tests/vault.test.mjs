@@ -168,3 +168,38 @@ test("passphrase tolerates mobile keyboards: accents and stray spaces", async ()
     /Senha mestra incorreta/,
   );
 });
+
+test("decryptVault opens another vault without unlocking the session", async () => {
+  const { createVault, decryptVault, lockVault, isVaultUnlocked, unlockVault } =
+    await import("../lib/vault.ts");
+  const record = {
+    id: "old-1",
+    kind: "site",
+    title: "Notion",
+    url: "https://notion.so/",
+    username: "nei",
+    secret: "senha-antiga",
+    notes: "",
+    providerId: "",
+    favorite: false,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+
+  const oldVault = await createVault("senha-antiga-1", [record]);
+  lockVault();
+  const current = await createVault("senha-atual-1");
+  assert.equal(isVaultUnlocked(), true);
+
+  const recovered = await decryptVault(oldVault, "senha-antiga-1");
+  assert.equal(recovered.records.length, 1);
+  assert.equal(recovered.records[0].secret, "senha-antiga");
+
+  // The session key still belongs to the current vault: sealing keeps working.
+  const resealed = await unlockVault(current, "senha-atual-1");
+  assert.equal(resealed.records.length, 0);
+  await assert.rejects(
+    decryptVault(oldVault, "senha-errada-1"),
+    /Senha mestra incorreta/,
+  );
+});

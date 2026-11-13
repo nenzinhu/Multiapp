@@ -11,6 +11,7 @@ import {
   Eye,
   EyeOff,
   Globe,
+  History,
   KeyRound,
   Lock,
   Pencil,
@@ -40,10 +41,13 @@ import { mergeImportedRecords } from "@/lib/password-import";
 import { entrance, pop, shake } from "@/lib/animations";
 import {
   changePassphrase,
+  clearConflictingVault,
   createVault,
+  decryptVault,
   lockVault,
   maskSecret,
   mergeVaultRecords,
+  readConflictingVault,
   readStoredVault,
   rememberVaultRecords,
   stashConflictingVault,
@@ -207,8 +211,13 @@ export function VaultView({ section }: { section: VaultSection }) {
     provider?: AiProvider;
   }>({ open: false, kind: "site" });
   const [passphraseMode, setPassphraseMode] = React.useState<
-    null | "create" | "change"
+    null | "create" | "change" | "recover"
   >(null);
+  const [stashed, setStashed] = React.useState<StoredVault | null>(null);
+
+  React.useEffect(() => {
+    setStashed(readConflictingVault());
+  }, []);
   const [importedVault, setImportedVault] = React.useState<StoredVault | null>(
     null,
   );
@@ -302,6 +311,42 @@ export function VaultView({ section }: { section: VaultSection }) {
 
   function notify(message: string, undo?: () => void, isError = false) {
     setNotice({ message, undo, error: isError });
+  }
+
+  async function recoverOldVault(passphrase: string) {
+    const stored = readConflictingVault();
+    if (!stored) {
+      setPassphraseMode(null);
+      setStashed(null);
+      notify("Não há cofre antigo guardado neste aparelho.", undefined, true);
+      return;
+    }
+    try {
+      const opening = await decryptVault(stored, passphrase);
+      const merged = mergeImportedRecords(records, opening.records);
+      await persist(merged.records);
+      clearConflictingVault();
+      setStashed(null);
+      setPassphraseMode(null);
+      notify(
+        `${merged.added} ${
+          merged.added === 1 ? "registro trazido" : "registros trazidos"
+        } do cofre antigo${merged.duplicates ? `, ${merged.duplicates} já existiam` : ""}.`,
+      );
+    } catch (caught) {
+      notify((caught as Error).message, undefined, true);
+    }
+  }
+
+  function discardOldVault() {
+    const stored = readConflictingVault();
+    if (!stored) return;
+    clearConflictingVault();
+    setStashed(null);
+    notify("Cofre antigo descartado deste aparelho.", () => {
+      stashConflictingVault(stored);
+      setStashed(stored);
+    });
   }
 
   async function pushSealed(sealed: StoredVault): Promise<void> {
@@ -833,6 +878,37 @@ export function VaultView({ section }: { section: VaultSection }) {
             </span>
           </div>
 
+          {!isProviders && stashed && (
+            <div className="vault-recovery" role="status">
+              <span className="vault-recovery-icon" aria-hidden="true">
+                <History size={18} />
+              </span>
+              <div>
+                <strong>Cofre antigo guardado neste aparelho</strong>
+                <span>
+                  De antes da sincronização, com outra senha mestra. Traga os
+                  registros para a sua conta.
+                </span>
+              </div>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => setPassphraseMode("recover")}
+              >
+                Recuperar
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Descartar cofre antigo"
+                title="Descartar cofre antigo"
+                onClick={discardOldVault}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          )}
+
           <div className="vault-toolbar">
             <div className="search-field vault-search">
               <Search size={16} />
@@ -1019,6 +1095,15 @@ export function VaultView({ section }: { section: VaultSection }) {
         onSubmit={(passphrase, confirmation) =>
           void changeMaster(passphrase, confirmation)
         }
+      />
+
+      <PassphraseDialog
+        open={passphraseMode === "recover"}
+        onOpenChange={(open) => !open && setPassphraseMode(null)}
+        title="Recuperar cofre antigo"
+        description="Digite a senha mestra do cofre que ficou neste aparelho. Os registros são mesclados na sua conta e o cofre antigo é apagado."
+        submitLabel="Trazer registros"
+        onSubmit={(passphrase) => void recoverOldVault(passphrase)}
       />
 
       <PassphraseDialog
