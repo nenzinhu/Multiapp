@@ -3325,3 +3325,32 @@ progress {
     flex-basis: calc(100% - 46px);
   }
 }
+
+/* Vault fingerprint and passphrase reveal */
+.vault-id {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.vault-id code {
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #191c21;
+  color: #bfdbfe;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+.vault-eye {
+  flex-shrink: 0;
+  width: 40px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--background);
+  color: #8c9aab;
+}
+.vault-eye:hover {
+  color: var(--primary);
+  background: var(--primary-soft);
+}

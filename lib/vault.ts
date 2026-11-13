@@ -324,6 +324,21 @@ export function readStoredVault(): StoredVault | null {
 export const VAULT_CONFLICT_KEY = "multiapp.vault.v1.conflict";
 
 /**
+ * Short, non-secret id for an envelope. Two devices can compare it to know
+ * whether they are looking at the same vault (a different id means a different
+ * master passphrase sealed it).
+ */
+export function vaultId(stored: StoredVault): string {
+  let hash = 0x811c9dc5;
+  const input = `${stored.salt}|${stored.iv}`;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0").slice(0, 6);
+}
+
+/**
  * Keeps a local vault that uses another master passphrase instead of letting it
  * overwrite the account copy. There is no UI to merge these yet; the envelope
  * stays available under VAULT_CONFLICT_KEY for manual recovery.

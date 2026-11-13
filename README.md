@@ -184,6 +184,11 @@ an actionable message instead of pretending to save.
   guardado neste aparelho" banner: enter that vault's master passphrase and its
   records are decrypted locally, merged into the account (deduplicated by host +
   user) and the stash is deleted. Dismissing the banner (with Undo) also works.
+- Every vault screen shows a short **vault id** (e.g. `Cofre 326efc`) plus the
+  update date. Two devices showing different ids are holding different vaults,
+  which is the usual reason a “same” passphrase is refused. The unlock field has
+  a reveal toggle, and if the account cannot be reached the screen says so and
+  offers “Tentar de novo” instead of suggesting a new vault.
 - The master passphrase is never stored. If it is forgotten the records
   cannot be recovered — export the vault regularly.
 - The vault starts locked on every page load and can be locked again with the
