@@ -1,6 +1,6 @@
 export const VAULT_STORAGE_KEY = "multiapp.vault.v1";
 export const VAULT_VERSION = 1;
-export const VAULT_MAX_RECORDS = 500;
+export const VAULT_MAX_RECORDS = 5000;
 
 export type VaultKind = "site" | "api";
 

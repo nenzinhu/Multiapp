@@ -403,3 +403,39 @@ Limites: permissão de clipboard varia por navegador (Safari pode pedir gesto a
 mais); a cópia sequencial usuário+senha não é possível — a senha fica no
 clipboard e o usuário tem um botão próprio. O segredo permanece na memória da
 aba por até 30s enquanto o cartão está aberto.
+
+## 2026 refresh: importar senhas do navegador (CSV e JSON)
+
+Pedido: trazer as senhas do Google, Edge e outros para o app, aceitando CSV e
+JSON, montando o banco de senhas do cofre.
+
+Implementação: `lib/password-import.ts` (detecção de formato, CSV RFC 4180 com
+aspas/quebras/`;`/tab/BOM, mapeamento de colunas em pt/en, JSON do Bitwarden,
+backup do Multiapp, array genérico e objeto único), `mergeImportedRecords`
+(deduplica por host + usuário respeitando o teto) e
+`components/vault/import-dialog.tsx` (arquivo até 5 MB ou texto colado, prévia
+com contagens e amostra sem senha). O cofre subiu de 500 para 5.000 registros.
+
+Testes de unidade (9 novos, 53 no total): CSV do Chrome com BOM, aspas e vírgula
+dentro do campo, `android://` ignorado e duplicata no mesmo arquivo; LastPass com
+`grouping` virando nota; Bitwarden CSV; CSV genérico com `;` e cabeçalho em
+português; Bitwarden JSON com nota segura ignorada; JSON criptografado recusado
+com explicação; backup do Multiapp ignorando chaves de API; array genérico, JSON
+inválido e arquivo sem linhas válidas; merge por host+usuário sem sobrescrever.
+
+Navegador (Chromium 1280x900, build de produção):
+
+| Passo | Resultado |
+| --- | --- |
+| Colar CSV do Chrome (3 linhas, 1 `android://`) | prévia "3 lidas · 2 prontas · 1 ignorada" com GitHub/Figma |
+| Importar | 2 linhas no cofre + toast "2 credenciais importadas" |
+| Voltar à biblioteca | 2 botões de chave (GitHub e Figma) |
+| Importar o mesmo CSV de novo | "0 prontas · 2 já existiam" e botão desabilitado |
+| Bitwarden JSON pelo seletor de arquivo | "1 pronta · 1 ignorada (nota)" e 1 registro no cofre |
+
+`tsc`, `lint` (só o aviso do favicon remoto), `npm test` (53 casos, 1 integração
+Postgres ignorada) e `build` sem erros.
+
+Limites: sem importação de `.1pux` (1Password só via CSV) e sem CSV criptografado
+do Bitwarden. Senhas não são exibidas na prévia; o arquivo importado não fica em
+disco (lido em memória). Sem teste com arquivo real de 5.000 linhas.
