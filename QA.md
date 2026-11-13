@@ -548,3 +548,31 @@ Limites: a mesclagem mantém a versão já existente quando host+usuário coinci
 (não compara a senha); não há restauração de chaves de API de um stash para a
 seção de provedores além do merge normal (elas entram no cofre e aparecem na
 seção).
+
+## 2026 refresh: diagnóstico de “senha mestra incorreta” no aparelho
+
+Depois de normalizar a senha e proteger o cofre da conta, o caso restante é
+“mesma senha, aparelhos diferentes”. Para isso o cofre agora se identifica:
+
+- `vaultId(envelope)` gera um código curto (FNV-1a do `salt|iv`, 6 hex) mostrado
+  como **“Cofre 326efc · atualizado em dd/mm/aaaa”** no portão bloqueado e no
+  topo do cofre aberto. Se os dois aparelhos mostram códigos diferentes, são
+  cofres diferentes (outra senha mestra) — não é erro de digitação.
+- O campo da senha mestra ganhou **mostrar senha** (olho) no portão.
+- Se `/api/vault` falha ao abrir a seção, o estado é **“Não foi possível falar com
+  a sua conta”** com **Tentar de novo**, e o botão “Criar cofre” não aparece —
+  antes, a pessoa podia criar um segundo cofre sem perceber.
+- Conflito de revisão no envio (`pushSealed`) agora guarda o envelope local com
+  `stashConflictingVault` antes de adotar o remoto, então o cofre recém-criado
+  vira recuperável em vez de desaparecer.
+
+Verificação (Chromium, 1280x900 e 390x844): conta A cria o cofre e o desktop B
+entra na mesma conta — os dois mostram **o mesmo código** (`326efc`); o olho
+aparece no portão. Com `/api/vault` bloqueado por `route.abort`, o portão mostra
+“Não foi possível falar com a sua conta”, **zero** botões “Criar cofre”, e depois
+de “Tentar de novo” (rota liberada) passa para “Crie seu cofre”. Sem erros de
+console; `tsc`, `lint`, 58 testes e `build` ok.
+
+Limites: o código identifica o cofre, não a pessoa; sem a senha mestra correta
+não há como abrir um envelope (por design). Se o aparelho tinha um cofre próprio
+e ele foi descartado antes desta versão, não há como recuperá-lo.

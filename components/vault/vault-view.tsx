@@ -54,6 +54,7 @@ import {
   sealRecords,
   unlockVault,
   vaultDomain,
+  vaultId,
   writeStoredVault,
   type StoredVault,
   type VaultRecord,
@@ -61,7 +62,7 @@ import {
 
 export type VaultSection = "sites" | "providers";
 
-type Status = "loading" | "setup" | "locked" | "unlocked";
+type Status = "loading" | "setup" | "locked" | "unlocked" | "unreachable";
 type Notice = { message: string; error?: boolean; undo?: () => void };
 
 function now(): number {
@@ -214,76 +215,86 @@ export function VaultView({ section }: { section: VaultSection }) {
     null | "create" | "change" | "recover"
   >(null);
   const [stashed, setStashed] = React.useState<StoredVault | null>(null);
+  const [vaultInfo, setVaultInfo] = React.useState<{
+    id: string;
+    updatedAt: number;
+  } | null>(null);
+  const [showUnlock, setShowUnlock] = React.useState(false);
 
   React.useEffect(() => {
     setStashed(readConflictingVault());
   }, []);
+
+  React.useEffect(() => {
+    const stored = readStoredVault();
+    setVaultInfo(
+      stored ? { id: vaultId(stored), updatedAt: stored.updatedAt } : null,
+    );
+  }, [status, syncState, stashed]);
   const [importedVault, setImportedVault] = React.useState<StoredVault | null>(
     null,
   );
 
   // Reconcile the local envelope with the account copy. Only sealed data
   // travels; adopting a newer remote copy is what makes a new device work.
-  React.useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const remote = await pullVault();
-        if (cancelled) return;
-        revisionRef.current = remote.revision;
-        const local = readStoredVault();
-        if (!remote.vault) {
-          if (local) await pushSealed(local);
-          else setSyncState("synced");
-          setStatus(readStoredVault() ? "locked" : "setup");
-          return;
-        }
-        if (!local || remote.vault.updatedAt > local.updatedAt) {
+  async function reconcileVault() {
+    setStatus((current) => (current === "unlocked" ? current : "loading"));
+    try {
+      const remote = await pullVault();
+      revisionRef.current = remote.revision;
+      const local = readStoredVault();
+      if (!remote.vault) {
+        if (local) await pushSealed(local);
+        else setSyncState("synced");
+        setStatus(readStoredVault() ? "locked" : "setup");
+        return;
+      }
+      if (!local || remote.vault.updatedAt > local.updatedAt) {
+        writeStoredVault(remote.vault);
+        setStatus("locked");
+        setRecords([]);
+        setAdoptedRemote(true);
+        if (local && local.salt !== remote.vault.salt)
+          notify(
+            "O cofre da sua conta veio de outro aparelho. Desbloqueie com a senha mestra usada lá.",
+            undefined,
+            true,
+          );
+        else if (local) notify("O cofre da sua conta é mais recente e foi atualizado aqui.");
+        setSyncState("synced");
+        return;
+      }
+      if (local.updatedAt > remote.vault.updatedAt) {
+        if (local.salt !== remote.vault.salt) {
+          // Different master passphrase on this device: never overwrite the
+          // account copy, keep the local envelope for recovery.
+          stashConflictingVault(local);
+          setStashed(local);
           writeStoredVault(remote.vault);
           setStatus("locked");
-          setRecords([]);
           setAdoptedRemote(true);
-          if (local && local.salt !== remote.vault.salt)
-            notify(
-              "O cofre da sua conta veio de outro aparelho. Desbloqueie com a senha mestra usada lá.",
-              undefined,
-              true,
-            );
-          else if (local) notify("O cofre da sua conta é mais recente e foi atualizado aqui.");
           setSyncState("synced");
+          notify(
+            "Este aparelho tinha um cofre com outra senha mestra. Abrimos o da conta e guardamos o local para recuperação.",
+            undefined,
+            true,
+          );
           return;
         }
-        if (local.updatedAt > remote.vault.updatedAt) {
-          if (local.salt !== remote.vault.salt) {
-            // Different master passphrase on this device: never overwrite the
-            // account copy, keep the local envelope for recovery.
-            stashConflictingVault(local);
-            writeStoredVault(remote.vault);
-            setStatus("locked");
-            setAdoptedRemote(true);
-            setSyncState("synced");
-            notify(
-              "Este aparelho tinha um cofre com outra senha mestra. Abrimos o da conta e guardamos o local para recuperação.",
-              undefined,
-              true,
-            );
-            return;
-          }
-          await pushSealed(local);
-          setStatus("locked");
-          return;
-        }
-        setSyncState("synced");
+        await pushSealed(local);
         setStatus("locked");
-      } catch {
-        if (cancelled) return;
-        setSyncState("offline");
-        setStatus(readStoredVault() ? "locked" : "setup");
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+      setSyncState("synced");
+      setStatus("locked");
+    } catch {
+      setSyncState("offline");
+      setStatus(readStoredVault() ? "locked" : "unreachable");
+    }
+  }
+
+  React.useEffect(() => {
+    void reconcileVault();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -360,7 +371,10 @@ export function VaultView({ section }: { section: VaultSection }) {
       }
       revisionRef.current = result.revision;
       if (result.vault && result.vault.updatedAt > sealed.updatedAt) {
-        // Another device wrote a newer copy: adopt it instead of overwriting.
+        // Another device wrote a newer copy: adopt it instead of overwriting,
+        // but keep this device's envelope recoverable.
+        stashConflictingVault(sealed);
+        setStashed(sealed);
         writeStoredVault(result.vault);
         setStatus("locked");
         setRecords([]);
@@ -647,6 +661,26 @@ export function VaultView({ section }: { section: VaultSection }) {
         </div>
       );
 
+    if (status === "unreachable")
+      return (
+        <div className="vault-gate" ref={gateRef}>
+          <span className="empty-symbol">
+            <Lock size={22} />
+          </span>
+          <h3>Não foi possível falar com a sua conta</h3>
+          <p>
+            Confira a conexão. Para não criar um cofre novo por engano, esperamos
+            a conta responder antes de oferecer “Criar cofre”.
+          </p>
+          <button
+            className="button primary"
+            onClick={() => void reconcileVault()}
+          >
+            Tentar de novo
+          </button>
+        </div>
+      );
+
     if (status === "setup")
       return (
         <div className="vault-gate" ref={gateRef}>
@@ -681,6 +715,13 @@ export function VaultView({ section }: { section: VaultSection }) {
             ? "Este cofre veio da sua conta: use a senha mestra que você usa nos outros aparelhos."
             : "Digite a senha mestra para abrir os registros."}
         </p>
+        {vaultInfo && (
+          <p className="vault-id">
+            Cofre <code>{vaultInfo.id}</code> · atualizado em{" "}
+            {new Date(vaultInfo.updatedAt).toLocaleDateString("pt-BR")} · compare
+            com o outro aparelho
+          </p>
+        )}
         <form
           className="vault-unlock-form"
           noValidate
@@ -691,7 +732,7 @@ export function VaultView({ section }: { section: VaultSection }) {
         >
           <input
             id="vault-unlock"
-            type="password"
+            type={showUnlock ? "text" : "password"}
             autoComplete="off"
             autoCapitalize="none"
             autoCorrect="off"
@@ -701,6 +742,15 @@ export function VaultView({ section }: { section: VaultSection }) {
             value={unlockValue}
             onChange={(event) => setUnlockValue(event.target.value)}
           />
+          <button
+            type="button"
+            className="icon-button vault-eye"
+            aria-label={showUnlock ? "Ocultar senha" : "Mostrar senha"}
+            aria-pressed={showUnlock}
+            onClick={() => setShowUnlock((value) => !value)}
+          >
+            {showUnlock ? <EyeOff size={17} /> : <Eye size={17} />}
+          </button>
           <button className="button primary" type="submit" disabled={busy}>
             Abrir cofre
           </button>
@@ -838,6 +888,12 @@ export function VaultView({ section }: { section: VaultSection }) {
               ? "Um catálogo de provedores gratuitos e as chaves que você já guardou."
               : "Credenciais de sites criptografadas neste navegador e na sua conta."}
           </p>
+          {status === "unlocked" && vaultInfo && (
+            <p className="vault-id">
+              Cofre <code>{vaultInfo.id}</code> · o mesmo código deve aparecer no
+              outro aparelho
+            </p>
+          )}
         </div>
         {status === "unlocked" && (
           <button
