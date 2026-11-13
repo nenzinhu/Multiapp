@@ -321,3 +321,29 @@ com `@` cru e URL sem o `@`). `tsc`, `lint` e `build` sem erros.
 
 Limites: a correção do valor na Vercel é manual (o app só diagnostica); a senha
 segue a mesma, então vale rotacioná-la depois.
+
+## 2026 refresh: biblioteca densa (tiles ~87% menores)
+
+Pedido: reduzir o tamanho dos cards para caber uma lista maior de apps. O card
+antigo (247x176 px na largura de referencia) virou um tile compacto com favicon
+22 px, nome, ponto da categoria, selo de favorito e menu.
+
+- Grade: `minmax(132px, 1fr)` com gap de 8 px (antes 190/168 px, gap 16).
+- Tile no desktop: 148x38 px em 6 colunas (antes 4 colunas de 247x176),
+  ~87% menos area — mais apps por linha e por tela.
+- Celular (390 px, touch): 2 colunas de 113x46 px, com `min-height: 44px` em
+  `pointer: coarse` para manter o alvo de toque; nomes completos visiveis.
+- Lista: linha de 77 px com o dominio na segunda linha.
+- O cartao inteiro continua sendo o link (overlay `.card-link:after`); o menu
+  fica em `z-index: 3`.
+- Favoritar saiu do botao no topo e virou o primeiro item do menu, com selo de
+  estrela no tile quando ativo. Verificado no navegador: selo 3 -> 4 e contador
+  da sidebar 3 -> 4 ao favoritar o GitHub pelo menu, sem erros de console.
+- O "Adicionar app" acompanhou o tamanho (linha unica, 22 px de icone).
+
+`tsc`, `lint`, `npm test` (43) e `build` sem erros; capturas em 1280x900 e
+390x844 conferidas. Sem regressao de overflow horizontal.
+
+Limites: a medicao de "70%" foi feita por area do card contra a largura da
+captura do usuario; em telas muito largas o `1fr` alarga os tiles e a densidade
+cai um pouco. Nao testado em leitor de tela apos a mudanca de menu.
