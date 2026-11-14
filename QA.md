@@ -601,3 +601,47 @@ Testes: 58 passando; `tsc`, `lint` e `build` ok.
 Limites: preenchimento automático real exige extensão de navegador (ou o gerenciador
 do próprio navegador). O app não guarda a senha em campos de terceiros e continua
 sem acesso a outras origens.
+
+## 2026 refresh: extensão do Chrome preenche as senhas sozinha
+
+O limite registrado na entrega anterior ("preenchimento automático real exige
+extensão") virou produto: `extension/` é uma extensão Manifest V3, embalada em
+`public/extension/multiapp-cofre.zip` e explicada em `/extensao` com o botão de
+download.
+
+Unidade — `npm test`: 70 testes, 69 passando e 1 pulado (Postgres sem
+`TEST_DATABASE_URL`). A suíte nova (`tests/extension.test.mjs`, 11 casos) cobre:
+abertura do envelope criado por `lib/vault.ts` com a cripto da extensão, recusa
+da senha mestra errada, `trim()` + NFKC (acento decomposto), reabertura pela
+chave exportada, envelope inválido, normalização de host, casamento de domínio
+(incluindo `exemplo.com.maliciosos.net`, IP, `localhost` e `co.ao`), filtro de
+credenciais de site, manifesto V3 apontando para arquivos existentes, checagem
+de sintaxe de todo `.js` e o ZIP publicado contendo todos os arquivos.
+
+Tipos e lint: `npx tsc --noEmit` sem erros; `npx eslint .` sem erros (só o aviso
+antigo de `<img>` do favicon). Build: `npm run build` compilou e prerenderizou
+`/extensao` como estática.
+
+Ponta a ponta em Chromium 156 headless (`node scripts/verify-extension.mjs`, que
+instala a pasta com `--load-extension` e conversa por CDP): o service worker
+carregou; com o cofre fechado o status veio `locked`; a extensão leu o envelope
+da aba do Multiapp; senha mestra errada voltou com "Senha mestra incorreta"; a
+certa abriu 1 credencial; o site de teste casou com o registro; **usuário e
+senha foram preenchidos sozinhos** no formulário e o selo apareceu; depois de
+"Bloquear", a página recarregada ficou sem preenchimento.
+
+Interface verificada no build de produção a 1280x900 e no popup a 320x470
+(2x): o popup bloqueado mostra só a senha mestra, "Procurar o cofre" e "Abrir o
+Multiapp"; o aberto mostra a contagem, o id do cofre, o interruptor de
+preenchimento automático, o envio de formulário (desligado) e o prazo de
+bloqueio; o cofre no app ganhou a faixa "Preencher senhas no Chrome" com o link
+"Como instalar"; `/extensao` lista os sete passos, o aviso de modo do
+desenvolvedor e serve o ZIP (200, 28 KB, 12 arquivos).
+
+Limites: a extensão não está na Chrome Web Store (instalação manual, aviso de
+modo do desenvolvedor é esperado); não cobre fluxo de duas etapas
+(e-mail → senha) nem login dentro de iframe com interface própria (o iframe é
+preenchido em silêncio); sem build para Firefox/Safari; o envio automático do
+formulário vem desligado; sem a senha mestra o cofre continua irrecuperável; e a
+chave aberta vive só na memória do navegador (fechar o Chrome exige digitar a
+senha de novo).

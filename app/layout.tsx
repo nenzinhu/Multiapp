@@ -7,6 +7,11 @@ export const metadata: Metadata = {
     "Guarde links de webapps, organize por categoria e abra a mesma biblioteca em qualquer aparelho.",
   applicationName: "Multiapp",
   manifest: "/manifest.webmanifest",
+  other: {
+    // Marca lida pela extensão do Chrome: só uma página do Multiapp entrega o
+    // envelope selado do cofre, e o script de conteúdo confere esta meta.
+    "multiapp-vault": "1",
+  },
   appleWebApp: {
     capable: true,
     title: "Multiapp",

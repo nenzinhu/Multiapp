@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { motion } from "motion/react";
 import {
   ArrowDownToLine,
@@ -16,6 +17,7 @@ import {
   Lock,
   Pencil,
   Plus,
+  Puzzle,
   Search,
   ShieldCheck,
   Star,
@@ -933,6 +935,24 @@ export function VaultView({ section }: { section: VaultSection }) {
                     : "Criptografado e sincronizado"}
             </span>
           </div>
+
+          {!isProviders && (
+            <div className="vault-chrome-hint">
+              <span className="vault-chrome-icon" aria-hidden="true">
+                <Puzzle size={18} />
+              </span>
+              <div>
+                <strong>Preencher senhas no Chrome</strong>
+                <span>
+                  A extensão do Multiapp entra no login dos sites sozinha, com a
+                  credencial guardada aqui.
+                </span>
+              </div>
+              <Link className="button secondary" href="/extensao">
+                Como instalar
+              </Link>
+            </div>
+          )}
 
           {!isProviders && stashed && (
             <div className="vault-recovery" role="status">

@@ -8,9 +8,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "prebuild": "node scripts/build-extension.mjs",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --test tests/collection.test.mjs tests/vault.test.mjs tests/accounts.test.mjs tests/postgres.test.mjs tests/password-import.test.mjs"
+    "test": "node --test tests/collection.test.mjs tests/vault.test.mjs tests/accounts.test.mjs tests/postgres.test.mjs tests/password-import.test.mjs tests/extension.test.mjs",
+    "ext:zip": "node scripts/build-extension.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
