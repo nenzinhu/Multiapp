@@ -3358,6 +3358,7 @@ progress {
 /* Instalação da extensão do Chrome (/extensao) */
 .extension-card {
   max-width: 680px;
+  margin-inline: auto;
 }
 .extension-lead {
   margin: 0 0 4px;
