@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Multiapp Cofre</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="head">
+        <div class="brand">
+          <span class="logo" aria-hidden="true"></span>
+          Multiapp Cofre
+        </div>
+        <span id="status-dot" class="dot" aria-hidden="true"></span>
+      </header>
+
+      <section id="locked-view" class="stack" hidden>
+        <p class="lead">
+          Digite a senha mestra para o Chrome preencher as suas senhas. Ela não
+          é guardada: a chave fica só na memória até você fechar o navegador.
+        </p>
+        <form id="unlock-form" class="stack">
+          <label class="field">
+            <span>Senha mestra</span>
+            <input
+              id="passphrase"
+              type="password"
+              autocomplete="current-password"
+              placeholder="senha mestra do cofre"
+              required
+            />
+          </label>
+          <button id="unlock" class="button primary" type="submit">
+            Desbloquear
+          </button>
+        </form>
+        <p id="locked-hint" class="hint"></p>
+        <div class="row">
+          <button id="scan" class="button ghost" type="button">
+            Procurar o cofre
+          </button>
+          <button id="open-app" class="button ghost" type="button" hidden>
+            Abrir o Multiapp
+          </button>
+        </div>
+      </section>
+
+      <section id="unlocked-view" class="stack" hidden>
+        <div class="summary">
+          <span
+            ><strong id="record-count">0</strong>
+            <span id="record-label">credenciais no cofre</span></span
+          >
+          <span id="vault-id" class="hint"></span>
+        </div>
+        <p id="site-line" class="hint"></p>
+        <ul id="site-matches" class="matches"></ul>
+
+        <div class="stack toggles">
+          <label class="switch">
+            <input id="toggle-autofill" type="checkbox" />
+            <span>Preencher sozinho ao abrir o site</span>
+          </label>
+          <label class="switch">
+            <input id="toggle-submit" type="checkbox" />
+            <span>Enviar o formulário depois de preencher</span>
+          </label>
+          <label class="field inline">
+            <span>Bloquear depois de</span>
+            <select id="lock-minutes">
+              <option value="5">5 minutos</option>
+              <option value="15">15 minutos</option>
+              <option value="30">30 minutos</option>
+              <option value="60">1 hora</option>
+              <option value="0">Nunca (até fechar)</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="row">
+          <button id="lock" class="button primary" type="button">
+            Bloquear agora
+          </button>
+          <button id="refresh" class="button ghost" type="button">
+            Atualizar do Multiapp
+          </button>
+        </div>
+      </section>
+
+      <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
+
+      <footer class="foot">
+        <a id="help-link" href="https://github.com" target="_blank" rel="noreferrer">
+          Como instalar e usar
+        </a>
+        <button id="open-app-foot" class="link" type="button">
+          Abrir o Multiapp
+        </button>
+      </footer>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

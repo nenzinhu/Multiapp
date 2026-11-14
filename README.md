@@ -25,7 +25,8 @@ Built with [Next.js](https://nextjs.org) (App Router) and Tailwind CSS v4.
 | `npm run build`   | Production build (`.next/`)                            |
 | `npm start`       | Serves the production build locally                    |
 | `npm run lint`    | ESLint (Next.js core-web-vitals + TypeScript rules)    |
-| `npm test`        | Unit tests for collection, vault, accounts and sync    |
+| `npm test`        | Unit tests for collection, vault, accounts, sync and the extension |
+| `npm run ext:zip` | Packs `extension/` into `public/extension/multiapp-cofre.zip` |
 
 ## Accounts, database and sync
 
@@ -208,13 +209,58 @@ an actionable message instead of pretending to save.
   The tile menu keeps "Abrir e copiar login", "Copiar só a senha" and "Copiar
   usuário". A website cannot type into another site's login form (cross-origin
   DOM access is blocked by the browser): true autofill needs a browser extension
-  or the browser's own password manager. With the vault locked, the tile
+  or the browser's own password manager — the **Multiapp Cofre** extension
+  (next section) does it. With the vault locked, the tile
   menu offers "Desbloquear e copiar login", asking for the master passphrase
   without leaving the library. Vault entries never request favicons, so
   no hostname leaves the browser.
 - "Exportar" writes the encrypted envelope to a JSON file; "Importar" asks for
   the passphrase of the imported file and merges the records, keeping the ones
   already stored. Limits: 5.000 records per vault.
+
+## Extensão do Chrome (preenchimento automático)
+
+`extension/` is a Manifest V3 extension that fills the site login with the
+credential kept in the vault. `public/extension/multiapp-cofre.zip` is the same
+folder packed for manual install; `/extensao` explains the steps in Portuguese
+and serves the download.
+
+- **Install:** download the ZIP, extract `multiapp-cofre`, open
+  `chrome://extensions`, enable *Modo do desenvolvedor*, click *Carregar sem
+  compactação* and pick the folder. Chrome, Edge, Brave and Opera all accept it;
+  it is not on the Chrome Web Store, so the developer-mode warning is expected.
+  `npm run ext:zip` rebuilds the ZIP after any change in `extension/`.
+- **Where the vault comes from:** the content script reads the sealed envelope
+  (`multiapp.vault.v1`) from a Multiapp page — the app exposes
+  `<meta name="multiapp-vault" content="1">`, so only the app answers — and hands
+  it to the service worker, which caches it in `chrome.storage.local`. The
+  server is never contacted: the extension works offline and with the app closed.
+- **Master passphrase:** typed in the popup only. The worker derives the AES-GCM
+  key (same PBKDF2 parameters as `lib/vault.ts`) and stores **the key**, not the
+  passphrase, in `chrome.storage.session` — memory only, wiped when the browser
+  closes and unreadable by content scripts (`TRUSTED_CONTEXTS`). A TTL
+  (5 min–4 h, default 30 min) locks it on its own; "Bloquear agora" does it
+  immediately. Decrypted records live in the worker's memory and are re-read
+  from the envelope after any lock.
+- **Autofill:** the content script matches `input[type=password]`, finds the
+  username field of the same form (autocomplete/name/id/placeholder heuristics,
+  preferring the one before the password) and sets the values with the native
+  setter plus `input`/`change` events, so React-controlled forms accept them. One
+  matching credential fills by itself; several show the floating badge with the
+  list (title + user). "Enviar o formulário depois de preencher" is off by
+  default. Pages without a password field are left alone, and SPA navigation
+  re-runs the match.
+- **Domain rule** (`extension/lib/site-match.js`): the credential applies to the
+  same registrable domain, so `www.` and subdomains inherit it
+  (`login.exemplo.com` × `www.exemplo.com`), while `exemplo.com.malicioso.net`
+  never receives the password of `exemplo.com`; IP and `localhost` match only
+  exactly. API keys in the vault are never offered to a site.
+- **Limits:** no two-step (e-mail → password) flow, no iframe overlay UI (frames
+  are filled silently), no Firefox build and no Chrome Web Store listing. The
+  browser extension is also the reason the app keeps the envelope in
+  `localStorage` instead of memory only.
+
+## Motion
 
 ## Motion
 
